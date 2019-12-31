@@ -5,7 +5,8 @@
 
     <p> If you are having any issues with the site or with inputting data or if you need to report anything broken, please fill out this contact form and
     we will respond as soon as possible: </p>
-  <form>
+  <form method="post">
+  {% csrf_token %}
 
      <table>
 <tbody>

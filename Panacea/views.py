@@ -1,3 +1,5 @@
+import csv
+import itertools
 import json
 from .validators import validation_test_for_transit_data
 
@@ -80,6 +82,8 @@ def dashboard(request):
     if current_user_profile.profile_complete is True:
         current_user_id = request.user.id
         user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
+        if user_org_id == 1:
+            return render(request, 'pages/dashboard.html', {'user_org': user_org_id})
         recent_vanpool_report = vanpool_report.objects. \
             filter(organization_id=user_org_id, report_date__isnull=False). \
             order_by('-report_year', '-report_month').first()
@@ -126,13 +130,16 @@ def dashboard(request):
             ghg_percent = ((current_monthly_emissions-last_year_monthly_emissions)/last_year_monthly_emissions)
             return [round(current_monthly_emissions, 2), ghg_percent]
 
-        return render(request, 'pages/dashboard.html', {
+        return render(request, 'pages/dashboard.html', { 'user_org': user_org_id,
             'groups_in_operation': get_most_recent_and_change("total_groups_in_operation"),
             'total_passenger_trips': get_most_recent_and_change("total_passenger_trips"),
             'average_riders_per_van': get_most_recent_and_change("average_riders_per_van"),
             'total_miles_traveled': get_most_recent_and_change("total_miles_traveled"),
             'co2_emissions_avoided': ghg_calculator(),
-            'report_status': check_status()
+            'report_status': check_status(),
+            'report_month': report_month,
+            'previous_report_year': previous_report_year,
+            'last_report_year': recent_vanpool_report.report_year
         })
 
     # If the user has completed their profile but has not had permissions assigned
@@ -563,12 +570,23 @@ def download_vanpool_data(request, org_id = None):
     org_id = profile.objects.get(custom_user_id=request.user.id).organization_id
     org_name = organization.objects.get(id=org_id).name
     vanshare_existence = organization.objects.get(id = org_id).vanshare_program
-    vanpool_report_filtered = vanpool_report.objects.filter(organization_id = org_id, vanpool_groups_in_operation__isnull=False)
-    vanpool_data = VanpoolReportFilter(request.GET, queryset=vanpool_report_filtered)
-    send_mail('testing', 'mymessage', settings.DEFAULT_FROM_EMAIL, ['schumen@wsdot.wa.gov'], fail_silently=False)
-    return render(request, 'pages/vanpool/download_vanpool_data.html', {'org_name': org_name,
-                                                                        'vanpool_data': vanpool_data,
-                                                                        'vanshare_existence': vanshare_existence})
+    vanpool_data = vanpool_report.objects.filter(organization_id = org_id, vanpool_groups_in_operation__isnull=False)
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="{}.csv"'.format(org_name)
+    writer = csv.writer(response)
+    count = 0
+
+    for k in vanpool_data:
+        if count == 0:
+            writer.writerow(list(k.__dict__.keys())[1:])
+            count +=1
+        else:
+           writer.writerow(list(k.__dict__.values())[1:])
+    return response
+#   return render(request, 'pages/vanpool/download_vanpool_data.html', {'org_name': org_name,
+#                                                                      'vanpool_data': vanpool_data,
+#                                                                     'vanshare_existence': vanshare_existence})
 
 
 
@@ -891,7 +909,7 @@ def report_transit_data(request, year=None, service=None):
                                                       administration_of_mode=my_active_service.administration_of_mode,
                                                       transit_mode=my_active_service.transit_mode).values_list('transit_metric_id', flat=True))
 
-        all_transit_metrics = list(transit_metric.objects.filter(agency_classification=classification).values_list("id", flat=True))
+        all_transit_metrics = list(transit_metrics.objects.filter(agency_classification=classification).values_list("id", flat=True))
 
         source_ids = [idx for idx in source_ids if idx in all_transit_metrics]
         if len(source_ids) != len(all_transit_metrics):
@@ -1254,7 +1272,7 @@ class SummaryDataEntryConstructor:
         if self.report_type == "revenue":
             return revenue_source
         elif self.report_type == "transit_data":
-            return transit_metric
+            return transit_metrics
         elif self.report_type == "expense":
             return expense_source
         elif self.report_type == "fund_balance":
@@ -1596,7 +1614,7 @@ def configure_agency_types(request, model=None):
         other_field_list = ['funding_type', 'government_type']
         one2one = False
     elif model == "transit_metric":
-        my_model = transit_metric
+        my_model = transit_metrics
         field_name = 'agency_classification'
         other_field_list = []
         one2one = False
@@ -1651,18 +1669,20 @@ def login_denied(request):
 
 
 def contact_us(request):
-    if request.method == 'GET':
-        form = email_contact_form()
-    else:
+    if request.method == 'POST':
         form = email_contact_form(request.POST)
         if form.is_valid():
             subject = form.cleaned_data['subject']
             from_email = form.cleaned_data['from_email']
             message = form.cleaned_data['message']
             try:
-                send_mail(subject, from_email, message, [settings.DEFAULT_FROM_EMAIL])
+                print('something')
+                send_mail(subject, message, from_email, [settings.DEFAULT_FROM_EMAIL, 'schumen@wsdot.wa.gov', 'wesleyi@wsdot.wa.gov'], fail_silently=False)
             except BadHeaderError:
                 return HttpResponse('Invalid header found')
-            return redirect('success')
+            return redirect('dashboard')
+    else:
+        form = email_contact_form()
+
     return render(request, 'pages/ContactUs.html', {'form':form})
 
