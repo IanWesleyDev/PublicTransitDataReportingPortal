@@ -6,7 +6,7 @@
         <!-- Page Heading -->
         <h1 class="h3 mb-2 text-gray-800" align = "center">Dashboard</h1>
 
-    {%  if user_org  == 1%}
+    {%  if vp_program  == False%}
         <div class="col-xl-12 col-md-12 mb-4">
                     <div class="card border-left-primary shadow h-100 py-2">
                         <div class="card-body">
@@ -104,7 +104,7 @@
                     </div>
                 </div>
             </div>
-            <p class="h3 mb-2 text-gray-800" align = "center"> Percent changes represent the difference between the month of {{ report_month| print_long_date_name }} {{ previous_report_year }} and the month of {{ report_month| print_long_date_name }} {{ last_report_year }}</p>
+            <p class="mb-2 text-gray-800" align = "center"> Percent changes represent the difference between the month of {{ report_month| print_long_date_name }} {{ previous_report_year }} and the month of {{ report_month| print_long_date_name }} {{ last_report_year }}</p>
 
             {% if report_status == "Past due" %}
                 <!-- Past Due -->

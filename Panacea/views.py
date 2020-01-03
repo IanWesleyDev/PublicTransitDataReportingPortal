@@ -76,14 +76,17 @@ def index(request):
 
 @login_required(login_url='/Panacea/login')
 def dashboard(request):
+    print(request.META['HTTP_USER_AGENT'])
     current_user_profile = profile.objects.get(custom_user=request.user)
 
     # If the user is registered and has had permissions assigned
     if current_user_profile.profile_complete is True:
         current_user_id = request.user.id
         user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
-        if user_org_id == 1:
-            return render(request, 'pages/dashboard.html', {'user_org': user_org_id})
+        print(organization.objects.get(id = user_org_id).vanpool_program)
+        if organization.objects.get(id = user_org_id).vanpool_program == False:
+            vp_program = False
+            return render(request, 'pages/dashboard.html', {'user_org': user_org_id, 'vp_program': vp_program})
         recent_vanpool_report = vanpool_report.objects. \
             filter(organization_id=user_org_id, report_date__isnull=False). \
             order_by('-report_year', '-report_month').first()
@@ -1204,7 +1207,6 @@ def review_data(request):
     for mode in mode_list:
         validation_test_for_transit_data(report_year, mode[0], mode[2], user_org, request.user.id)
     ve = validation_errors.objects.filter(organization_id = user_org, year = report_year, error_resolution__isnull=True)
-    print(ve)
     my_formset_factory = modelformset_factory(model=validation_errors,
                                              form=validation_error_form,
                                              extra=0)
@@ -1235,10 +1237,11 @@ class SummaryDataEntryConstructor:
         self.year = get_current_summary_report_year()
         self.form_filter_1 = form_filter_1
         self.form_filter_2 = form_filter_2
-
         self.set_default_form_filters()
 
     def set_default_form_filters(self):
+        import pdb
+        pdb.set_trace()
         if self.form_filter_1 is not None:
             pass
         else:
@@ -1380,7 +1383,6 @@ class SummaryDataEntryConstructor:
 
     def get_formset_query_dict(self):
         if self.report_type in ['transit_data', ]:
-            print(self.target_organization.summary_organization_classifications)
 
             query_dict = {'transit_mode__name': self.form_filter_1,
                           'administration_of_mode': self.form_filter_2,
@@ -1389,12 +1391,10 @@ class SummaryDataEntryConstructor:
         elif self.report_type in ['revenue', ]:
             query_dict = {'revenue_source__government_type': self.form_filter_1,
                           'revenue_source__funding_type': self.form_filter_2}
-            print(query_dict)
         elif self.report_type in ['expense', 'fund_balance', ]:
             query_dict = {}
         else:
             raise Http404
-        print(query_dict)
         return query_dict
 
     def get_formsets_labels_and_masking_class(self):
@@ -1478,17 +1478,25 @@ class SummaryDataEntryTemplateData:
             self.show_totals = False
         else:
             self.show_totals = True
+    def access_method(self):
+        print(self.formsets)
+        print(self.form_filter_1)
+        print(self.form_filter_2)
+        print(self.formset_labels)
+        print(self.nav_filters)
 
 
 @login_required(login_url='/Panacea/login')
 @group_required('Summary reporter', 'WSDOT staff')
 def summary_reporting(request, report_type=None, form_filter_1=None, form_filter_2=None):
     user_org = find_user_organization(request.user.id)
+    print(user_org)
 
     if report_type is None:
         report_type = "transit_data"
 
     requested_form = SummaryDataEntryConstructor(report_type, user_org, form_filter_1=form_filter_1, form_filter_2=form_filter_2)
+
 
     template_data = SummaryDataEntryTemplateData(requested_form, report_type)
 
