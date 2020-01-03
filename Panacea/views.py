@@ -1685,7 +1685,7 @@ def contact_us(request):
             message = form.cleaned_data['message']
             try:
                 print('something')
-                send_mail(subject, message, from_email, [settings.DEFAULT_FROM_EMAIL, 'schumen@wsdot.wa.gov', 'wesleyi@wsdot.wa.gov'], fail_silently=False)
+                send_mail(subject, message, from_email, [settings.DEFAULT_FROM_EMAIL,], fail_silently=False)
             except BadHeaderError:
                 return HttpResponse('Invalid header found')
             return redirect('dashboard')
