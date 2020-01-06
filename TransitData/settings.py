@@ -63,7 +63,8 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'rest_framework',
     'rest_framework.authtoken',
-    'rest_auth'
+    'rest_auth',
+
 ]
 
 MIDDLEWARE = [
@@ -76,6 +77,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'simple_history.middleware.HistoryRequestMiddleware',
+
 ]
 
 
@@ -187,6 +189,8 @@ CELERY_BEAT_SCHEDULE = {'send_emails_now': {'task': 'Panacea.tasks.send_emails_n
                                             'schedule': crontab(minute="*")}
 
 }
+
+
 
 MEDIA_ROOT = '/var/media/'
 MEDIA_URL = '/media/'

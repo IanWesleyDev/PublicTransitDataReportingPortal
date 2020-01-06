@@ -10,7 +10,7 @@
   <form method="post" aria-label="Email Contact Form" title = "Email Contact Form" type = "text">
   {% csrf_token %}
 
-     <table>
+     <table style = "padding: 80px">
 <tbody>
         <tr>
             <td aria-label="Email Address of Contact"> Email</td>
@@ -30,8 +30,8 @@
 </tbody>
 
      </table>
-
-<input type="submit" value="Submit" aria-label="Submit" class="btn btn-primary">
+<p></p>
+<input type="submit" value="Submit" aria-label="Submit" class="btn btn-primary" style="width:100px; display:inline-block;margin-left: 40px;">
 </form>
 
 {%  endblock %}

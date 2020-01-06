@@ -65,6 +65,7 @@ def register(request):
             return redirect('dashboard')
     else:
         form = CustomUserCreationForm()
+
     return render(request, 'registration/register.html', {'form': form})
 
 
@@ -76,7 +77,7 @@ def index(request):
 
 @login_required(login_url='/Panacea/login')
 def dashboard(request):
-    print(request.META['HTTP_USER_AGENT'])
+    print(request.user_agent.browser)
     current_user_profile = profile.objects.get(custom_user=request.user)
 
     # If the user is registered and has had permissions assigned
