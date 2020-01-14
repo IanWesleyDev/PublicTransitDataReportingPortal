@@ -1,6 +1,9 @@
 import calendar
 import json
-from .models import organization, vanpool_expansion_analysis, vanpool_report, profile
+
+from django_pandas.io import read_frame
+import pandas as pd
+from .models import organization, vanpool_expansion_analysis, vanpool_report, profile, transit_data, service_offered, transit_mode
 from django.db.models import Max, Subquery, F, OuterRef, Case, CharField, Value, When, Sum, Count, Avg, FloatField, \
     ExpressionWrapper
 from django.db.models.functions import Coalesce
@@ -12,6 +15,59 @@ from dateutil.relativedelta import relativedelta
 #####
 
 #
+
+
+
+def data_prep_for_transits(years, user_org_id):
+    '''function for pulling all available data within certain years for a transit and pushing it out to a summary sheet'''
+    services_offered = service_offered.objects.filter(organization_id=user_org_id).values('administration_of_mode',
+                                                                                          'transit_mode_id')
+    data_transit = transit_data.objects.filter(organization_id=user_org_id, year__in=years)
+    function_count = 0
+    # dual for loops, one for services offered, one for the years in existence
+    for i in services_offered:
+        filter = data_transit.filter(administration_of_mode=i['administration_of_mode'],
+                                     transit_mode_id=i['transit_mode_id'])
+        df = read_frame(filter)
+        count = 0
+        for year in years:
+            testdf = df[df.year == year]
+            testdf = testdf[testdf.reported_value.notna()][['id', 'transit_metric', 'reported_value']]
+            index_list = testdf[testdf.transit_metric != 'Employees - FTEs'].index
+            testdf['year'] = year
+            if count == 0:
+                finaldf = testdf
+                count += 1
+            else:
+                finaldf = pd.concat([testdf, finaldf], axis=0)
+                # pivot method here turns transit metics into the index and years into columns
+        finaldf = finaldf.pivot(index='transit_metric', columns='year', values='reported_value').fillna(0)
+        order_list = ['Revenue Vehicle Hours', 'Total Vehicle Hours', 'Revenue Vehicle Miles',
+                      'Total Vehicle Miles', 'Passenger Trips',
+                      'Diesel Fuel Consumed (gallons)', 'Gasoline Fuel Consumed (gallons)',
+                      'Propane Fuel Consumed (gallons)', 'Electricity Consumed (kWh)',
+                      'Employees - FTEs', 'Operating Expenses', 'Farebox Revenues']
+        # orders the index based on Summary styling
+        finaldf = finaldf.reindex(order_list).dropna()
+        finaldf = finaldf.reset_index()
+        # adds a percent change column
+        finaldf['Percentage Change'] = ((finaldf.iloc[:, 3] - finaldf.iloc[:, 2]) / finaldf.iloc[:, 2])* 100
+        finaldf['role'] = 'body'
+        transit_name = transit_mode.objects.filter(id=i['transit_mode_id']).values('name')[0]['name']
+        mode_name = '{} ({})'.format(transit_name, i['administration_of_mode'])
+        mode_list = [mode_name, '', '', '', '', 'heading']
+        columns_list = finaldf.columns.tolist()
+        mode_list_df = pd.DataFrame(dict(zip(columns_list, mode_list)), index = [0])
+        finaldf = pd.concat([mode_list_df, finaldf]).reset_index(drop=True)
+        if function_count == 0:
+            enddf = finaldf
+            function_count += 1
+        else:
+            enddf = pd.concat([enddf, finaldf], axis=0)
+    enddf = enddf.fillna('-')
+    enddf.columns = ['transit_metric', 'year1', 'year2', 'year3', 'percent_change', 'role']
+    return enddf
+
 
 def complete_data():
     latest_data = vanpool_report.objects.filter(vanpool_groups_in_operation__isnull=False).values('report_year','report_month').annotate(Count('id')).order_by('-id__count', '-report_year', '-report_month').first()

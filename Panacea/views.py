@@ -1,6 +1,11 @@
 import csv
 import itertools
 import json
+
+from django.template import RequestContext
+from django_pandas.io import read_frame
+import pandas as pd
+
 from .validators import validation_test_for_transit_data
 
 from django.contrib import messages
@@ -20,7 +25,8 @@ import datetime
 from Panacea.decorators import group_required
 from .utilities import monthdelta, get_wsdot_color, get_vanpool_summary_charts_and_table, percent_change_calculation, \
     find_vanpool_organizations, get_current_summary_report_year, filter_revenue_sheet_by_classification, \
-    find_user_organization_id, complete_data, green_house_gas_per_sov_mile, green_house_gas_per_vanpool_mile
+    find_user_organization_id, complete_data, green_house_gas_per_sov_mile, green_house_gas_per_vanpool_mile, \
+    data_prep_for_transits
 from django.http import Http404
 from .filters import VanpoolExpansionFilter, VanpoolReportFilter
 from django.conf import settings
@@ -77,14 +83,12 @@ def index(request):
 
 @login_required(login_url='/Panacea/login')
 def dashboard(request):
-    print(request.user_agent.browser)
     current_user_profile = profile.objects.get(custom_user=request.user)
 
     # If the user is registered and has had permissions assigned
     if current_user_profile.profile_complete is True:
         current_user_id = request.user.id
         user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
-        print(organization.objects.get(id = user_org_id).vanpool_program)
         if organization.objects.get(id = user_org_id).vanpool_program == False:
             vp_program = False
             return render(request, 'pages/dashboard.html', {'user_org': user_org_id, 'vp_program': vp_program})
@@ -1241,8 +1245,6 @@ class SummaryDataEntryConstructor:
         self.set_default_form_filters()
 
     def set_default_form_filters(self):
-        import pdb
-        pdb.set_trace()
         if self.form_filter_1 is not None:
             pass
         else:
@@ -1676,7 +1678,7 @@ def your_logged_in(request):
 def login_denied(request):
     return render(request, 'login_denied.html')
 
-
+@login_required(login_url='/Panacea/login')
 def contact_us(request):
     if request.method == 'POST':
         form = email_contact_form(request.POST)
@@ -1694,4 +1696,18 @@ def contact_us(request):
         form = email_contact_form()
 
     return render(request, 'pages/ContactUs.html', {'form':form})
+
+
+
+
+@login_required(login_url='/Panacea/login')
+def view_agency_report(request):
+    #TODO replace with a real function
+    years = [2016, 2017, 2018]
+    current_user_id = request.user.id
+    user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
+    enddf = data_prep_for_transits(years, user_org_id)
+    heading_years = ['Annual Operating Information'] + years +['One Year Change (%)']
+    data = enddf.to_dict(orient = 'records')
+    return render(request, 'pages/summary/view_agency_report.html', {'data':data, 'years': heading_years})
 
