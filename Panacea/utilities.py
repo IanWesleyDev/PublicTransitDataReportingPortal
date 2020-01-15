@@ -3,7 +3,7 @@ import json
 
 from django_pandas.io import read_frame
 import pandas as pd
-from .models import organization, vanpool_expansion_analysis, vanpool_report, profile, transit_data, service_offered, transit_mode
+from .models import organization, vanpool_expansion_analysis, vanpool_report, profile, transit_data, service_offered, transit_mode, revenue
 from django.db.models import Max, Subquery, F, OuterRef, Case, CharField, Value, When, Sum, Count, Avg, FloatField, \
     ExpressionWrapper
 from django.db.models.functions import Coalesce
@@ -15,6 +15,45 @@ from dateutil.relativedelta import relativedelta
 #####
 
 #
+
+def get_farebox_and_vp_revenues(years, user_org_id):
+    farebox = transit_data.objects.filter(organization_id=user_org_id, year__in=years, transit_metric__name='Farebox Revenues',
+                                transit_mode_id__in= [1,2,4,5,6,7,8,9,10]).values('year').annotate(reported_value = Sum('reported_value'))
+    farebox = read_frame(farebox)
+    farebox['revenue_source'] = 'Farebox Revenues'
+    vanpool = transit_data.objects.filter(organization_id=user_org_id, year__in=years,
+                                          transit_metric__name='Farebox Revenues',
+                                          transit_mode_id__in=[3]).values('year').annotate(reported_value=Sum('reported_value'))
+    vanpool = read_frame(vanpool)
+    vanpool['revenue_source'] = 'Vanpooling Revenue'
+    fares = pd.concat([farebox, vanpool], axis=0)
+    return fares
+
+def other_operating_sub_total(years, user_org_id):
+    other_op = revenue.objects.filter(organization_id=user_org_id, year__in=years, revenue_source__name__in= ['Other-Advertising',
+        'Other-Gain (Loss) on Sale of Assets', 'Other-Interest', 'Other-MISC']).values('year').annotate(reported_value = Sum('reported_value'))
+    other_op = read_frame(other_op)
+    other_op['revenue_source'] = 'Other Operating Sub-Total'
+    return other_op
+
+def build_revenue_table(years, user_org_id):
+    data_revenue = revenue.objects.filter(organization_id = user_org_id, year__in = years)
+    df = read_frame(data_revenue)
+    count = 0
+    for year in years:
+        testdf = df[df.year == year]
+        print(testdf.columns)
+        testdf = testdf[testdf.reported_value.notna()][['id', 'revenue_source', 'reported_value']]
+        testdf['year'] = year
+        if count == 0:
+            finaldf = testdf
+            count += 1
+        else:
+            finaldf = pd.concat([testdf, finaldf], axis=0)
+    fares = get_farebox_and_vp_revenues(years, user_org_id)
+    other_op = other_operating_sub_total(years, user_org_id)
+    finaldf = pd.concat([finaldf, fares, other_op], axis=0)
+    finaldf = finaldf.pivot(index='revenue_source', columns='year', values='reported_value').fillna(0)
 
 
 
@@ -33,7 +72,6 @@ def data_prep_for_transits(years, user_org_id):
         for year in years:
             testdf = df[df.year == year]
             testdf = testdf[testdf.reported_value.notna()][['id', 'transit_metric', 'reported_value']]
-            index_list = testdf[testdf.transit_metric != 'Employees - FTEs'].index
             testdf['year'] = year
             if count == 0:
                 finaldf = testdf
