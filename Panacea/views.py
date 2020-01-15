@@ -51,7 +51,7 @@ from .forms import CustomUserCreationForm, \
     Modify_A_Vanpool_Expansion, organisation_summary_settings, organization_information, cover_sheet_service, \
     cover_sheet_organization, \
     summary_revenue_form, summary_expense_form, service_offered, transit_data_form, \
-    fund_balance_form, service_offered_form, validation_error_form, email_contact_form
+    fund_balance_form, service_offered_form, validation_error_form, email_contact_form, change_user_org
 
 from .models import profile, vanpool_report, custom_user, vanpool_expansion_analysis, organization, cover_sheet, \
     revenue, transit_data, expense, expense_source, service_offered, revenue_source, \
@@ -1325,7 +1325,7 @@ def summary_reporting(request, report_type=None, form_filter_1=None, form_filter
 
     return render(request, 'pages/summary/summary_reporting.html', {'template_data': template_data})
 
-
+@login_required(login_url='/Panacea/login')
 def configure_agency_types(request, model=None):
 
     if not model or model == "organization":
@@ -1382,8 +1382,9 @@ def configure_agency_types(request, model=None):
         my_queryset = my_model.objects.all()
         formset = formset_factory(queryset=my_queryset.select_related())
         return render(request, 'pages/summary/configure_agency_types.html', {'formset': formset,
-                                                                             'model': model})
 
+                                                                             'model': model})
+@login_required(login_url='/Panacea/login')
 def review_cover_sheets(request):
 
     return render(request, 'pages/summary/review_cover_sheets.html')
@@ -1433,3 +1434,18 @@ def view_agency_report(request):
 
     return render(request, 'pages/summary/view_agency_report.html', {'data':operating_data, 'years': transit_heading_years})
 
+@login_required(login_url='/Panacea/login')
+@group_required('WSDOT staff')
+def test_tools(request):
+
+
+    if request.POST:
+        custom_user_id = request.POST.get('custom_user')
+        my_instance = profile.objects.get(custom_user_id=custom_user_id)
+        print(request.POST)
+        form = change_user_org(request.POST, instance=my_instance)
+        if form.is_valid():
+            form.save()
+    else:
+         form = change_user_org()
+    return render(request, 'pages/test_tools.html', {'form': form})

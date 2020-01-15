@@ -54,6 +54,7 @@ urlpatterns = [
     path('OrganizationProfile/<redirect_to>/', views.OrganizationProfile, name="OrganizationProfile"),
     path('OrganizationProfile/Users', views.OrganizationProfileUsers, name="OrganizationProfileUsers"),
     path('Permissions/', views.Permissions, name="Permissions"),
+    path('test_tools/', views.test_tools, name="test_tools"),
     path('Admin/Expansion/', views.Vanpool_expansion_analysis, name="Vanpool_expansion_analysis"),
     path('Admin/Operation_Summary', views.Operation_Summary, name='Operation_Summary'),
     path('Admin/VanpoolGrowth', views.Vanpool_Growth, name='Vanpool_Growth'),

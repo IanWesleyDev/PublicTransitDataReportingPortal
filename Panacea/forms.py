@@ -818,3 +818,13 @@ class email_contact_form(forms.Form):
 
 
 # endregion
+
+
+class change_user_org(forms.ModelForm):
+    class Meta:
+        model = profile
+        fields = ['custom_user', 'organization']
+        widgets = {
+            'custom_user': forms.Select(),
+            'organization': forms.Select(),
+        }
