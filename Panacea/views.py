@@ -55,7 +55,8 @@ from .forms import CustomUserCreationForm, \
 
 from .models import profile, vanpool_report, custom_user, vanpool_expansion_analysis, organization, cover_sheet, \
     revenue, transit_data, expense, expense_source, service_offered, revenue_source, \
-    transit_metrics, transit_mode, fund_balance, fund_balance_type, summary_organization_type, validation_errors
+    transit_metrics, transit_mode, fund_balance, fund_balance_type, summary_organization_type, validation_errors, \
+    summary_report_status
 from django.contrib.auth.models import Group
 from .utilities import calculate_latest_vanpool, find_maximum_vanpool, calculate_remaining_months, calculate_if_goal_has_been_reached, \
     generate_summary_report_years, find_user_organization_id, find_user_organization
@@ -1384,10 +1385,7 @@ def configure_agency_types(request, model=None):
         return render(request, 'pages/summary/configure_agency_types.html', {'formset': formset,
 
                                                                              'model': model})
-@login_required(login_url='/Panacea/login')
-def review_cover_sheets(request):
 
-    return render(request, 'pages/summary/review_cover_sheets.html')
 
 
 @login_required(login_url='/Panacea/login')
@@ -1434,10 +1432,55 @@ def view_agency_report(request):
 
     return render(request, 'pages/summary/view_agency_report.html', {'data':operating_data, 'years': transit_heading_years})
 
+
+@login_required(login_url='/Panacea/login')
+@group_required('WSDOT staff')
+def create_new_tracking_year(request, year):
+    #TODO add summary reporter flag
+    all_orgs = organization.objects.filter(summary_reporter=True).all()
+
+    with transaction.atomic():
+        for org in all_orgs:
+            t = summary_report_status.objects.get_or_create(organization=org, year=year)
+
+    return summary_tracking(request)
+
+@login_required(login_url='/Panacea/login')
+@group_required('WSDOT staff')
+def summary_tracking(request, year=None):
+    if year is None:
+        year = summary_report_status.objects.aggregate(Max('year'))
+        year = year['year__max']
+        print(year)
+    if request.POST:
+        pass
+    else:
+        pass
+    tracking_data = summary_report_status.objects.filter(year=year, organization__summary_reporter=True).order_by('organization__name')
+    print(tracking_data)
+
+    return render(request, 'pages/summary/admin/summary_tracking.html', {'year': year, 'tracking_data': tracking_data})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('WSDOT staff')
+def wsdot_review_cover_sheets(request):
+    return render(request, 'pages/summary/admin/wsdot_review_cover_sheet.html')
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('WSDOT staff')
+def wsdot_review_data(request):
+    if request.POST:
+        pass
+    else:
+        pass
+    return render(request, 'pages/summary/admin/wsdo_review_data.html')
+
+
 @login_required(login_url='/Panacea/login')
 @group_required('WSDOT staff')
 def test_tools(request):
-
 
     if request.POST:
         custom_user_id = request.POST.get('custom_user')

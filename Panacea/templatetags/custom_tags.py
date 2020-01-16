@@ -10,10 +10,12 @@ def in_category(things, category):
     things = [i for i in things if i.year == category]
     return things
 
-@register.simple_tag(name = 'get_org_name')
+
+@register.simple_tag(name='get_org_name')
 def print_org_name(organization_id):
-    name = organization.objects.get(id = organization_id).name
+    name = organization.objects.get(id=organization_id).name
     return name
+
 
 @register.filter(name='print_long_date_name')
 def print_long_date_name(int_month):

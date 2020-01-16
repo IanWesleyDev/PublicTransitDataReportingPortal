@@ -134,6 +134,7 @@ class organization(models.Model):
     # TODO add to agency profile form
     in_jblm_area = models.BooleanField(blank=True, null=True)  # TODO confirm this is no longer needed
     in_puget_sound_area = models.BooleanField(blank=True, null=True)
+    summary_reporter = models.BooleanField(default=True)
     summary_organization_classifications = models.ForeignKey(summary_organization_type, on_delete=models.PROTECT, blank=True, null=True)
     #fixed_route_expansion = models.BooleanField(blank=True, null=True)
 
@@ -523,6 +524,25 @@ class validation_errors(models.Model):
     class Meta:
         unique_together = ['year', 'transit_mode', 'administration_of_mode', 'organization', 'error']
 
+
+class summary_report_status(models.Model):
+
+    STATUS = (
+        ("With user", "With user"),
+        ("With WSDOT", "With WSDOT"),
+        ("Complete", "Complete")
+    )
+
+    year = models.IntegerField()
+    organization = models.ForeignKey(organization, on_delete=models.PROTECT)
+    cover_sheet_status = models.CharField(default="With user", max_length=80, choices=STATUS)
+    cover_sheet_submitted_for_review = models.BooleanField(default=False)
+    data_report_status = models.CharField(default="With user", max_length=80, choices=STATUS)
+    data_report_submitted_for_review = models.BooleanField(default=False)
+    history = HistoricalRecords()
+
+    class Meta:
+        unique_together = ('year', 'organization',)
 
 
 
