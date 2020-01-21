@@ -62,6 +62,10 @@
                                             </tr>
                                         </table>
 
+                                        {{ form.executive_officer_title.label_tag }}
+                                        <p>{{ form.executive_officer_title }}</p>
+                                        {{ form.executive_officer_title.errors }}
+
                                         {{ form.service_website_url.label_tag }}
                                         <p>{{ form.service_website_url }}</p>
                                         {{ form.service_website_url.errors }}

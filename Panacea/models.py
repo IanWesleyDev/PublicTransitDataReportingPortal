@@ -486,9 +486,14 @@ class cover_sheet(models.Model):
     monorail_ownership = models.CharField(max_length=250, blank=True, null=True)
     community_planning_region = models.CharField(max_length=50, blank=True, null=True)
     organization_logo = models.BinaryField(editable=True, blank=True, null=True)
+    history = HistoricalRecords()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['organization'], name="unique_organization")
+        ]
 
 
-# TODO Take out of camel case so the database table names are clean
 class service_offered(models.Model):
     DO_OR_PT = (
         ('Direct Operated', 'Direct Operated'),
@@ -545,6 +550,20 @@ class summary_report_status(models.Model):
         unique_together = ('year', 'organization',)
 
 
+class cover_sheet_review_notes(models.Model):
+    NOTE_AREAS = (
+        ("Address", "Address"),
+        ("Organization", "Organization"),
+        ("Service", "Service"),
+    )
+
+    year = models.IntegerField()
+    summary_report_status = models.ForeignKey(summary_report_status, on_delete=models.PROTECT)
+    note = models.TextField(blank=True, null=True)
+    note_area = models.CharField(max_length=80, choices=NOTE_AREAS)
+    wsdot_note = models.BooleanField(default=True)
+    custom_user = models.ForeignKey(custom_user, on_delete=models.PROTECT, blank=True, null=True)
+    date = models.DateTimeField(auto_now_add=True, blank=True, null=True)
 
 # class ending_balance_categories(models.Model):
 #     ending_balance_category = models.CharField(max_length=100, blank=False, null = False)
