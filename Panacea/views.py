@@ -808,32 +808,36 @@ def cover_sheet_organization_view(request):
     cover_sheet_instance, created = cover_sheet.objects.get_or_create(organization_id=org.id)
     form = cover_sheet_organization(instance=cover_sheet_instance)
     notes = cover_sheet_review_notes.objects.filter(year=get_current_summary_report_year(), summary_report_status__organization=org, note_area="Organization")
+    new_note_form = add_cover_sheet_review_note()
     try:
         base64_logo = base64.encodebytes(cover_sheet_instance.organization_logo).decode("utf-8")
     except:
         base64_logo = ""
 
     if request.POST:
-        form = cover_sheet_organization(data=request.POST, files=request.FILES)
+        form = cover_sheet_organization(instance=cover_sheet_instance, data=request.POST, files=request.FILES)
 
         if form.is_valid():
             instance = form.save(commit=False)
-            instance.organization = org
-            instance.id = cover_sheet_instance.id
             filepath = request.FILES.get('organization_logo_input', False)
 
             if filepath:
                 instance.organization_logo = filepath.read()
                 base64_logo = base64.encodebytes(instance.organization_logo).decode("utf-8")
             else:
-                instance.organization_logo = cover_sheet_instance.organization_logo
+                if cover_sheet_instance.organization_logo:
+                    instance.organization_logo = cover_sheet_instance.organization_logo
+                else:
+                    instance.organization_logo = None
 
             instance.save()
 
     return render(request, 'pages/summary/cover_sheet_organization.html', {'form': form,
                                                                            'org_name': org_name,
                                                                            'base64_logo': base64_logo,
-                                                                           'notes': notes})
+                                                                           'year': get_current_summary_report_year(),
+                                                                           'notes': notes,
+                                                                           'new_note_form': new_note_form})
 
 
 @login_required(login_url='/Panacea/login')
@@ -1056,10 +1060,13 @@ class SummaryDataEntryConstructor:
                 self.form_filter_2 = 'Operating'
             elif self.report_type == "transit_data":
                 # TODO Make this into something that makes more sense
-                self.form_filter_1 = self.get_model().objects.filter(organization=self.target_organization).order_by(
-                    'transit_mode__name').values_list('transit_mode__name').first()[0]
-                self.form_filter_2 = self.get_model().objects.filter(organization=self.target_organization).order_by(
+                self.form_filter_1 = service_offered.objects.filter(organization=self.target_organization).order_by('transit_mode__name').values_list('transit_mode__name').first()[0]
+                self.form_filter_2 = service_offered.objects.filter(organization=self.target_organization).order_by(
                     'administration_of_mode').values_list('administration_of_mode').first()[0]
+                # self.form_filter_1 = self.get_model().objects.filter(organization=self.target_organization).order_by(
+                #     'transit_mode__name').values_list('transit_mode__name').first()[0]
+                # self.form_filter_2 = self.get_model().objects.filter(organization=self.target_organization).order_by(
+                #     'administration_of_mode').values_list('administration_of_mode').first()[0]
             elif self.report_type in ["expense", "fund_balance"]:
                 self.form_filter_1 = None
                 self.form_filter_2 = None
@@ -1527,7 +1534,27 @@ def wsdot_review_cover_sheets(request, year=None, organization_id=None):
         'organization__name').filter(organization__name__lt=organization_name).last()
 
     if cover_sheet_submitted:
-        cover_sheet_form = cover_sheet_wsdot_review(instance=cover_sheet.objects.get(organization_id=organization_id))
+        if request.POST:
+            cover_sheet_form = cover_sheet_wsdot_review(data=request.POST, instance=cover_sheet.objects.get(organization_id=organization_id), files=request.FILES)
+            if cover_sheet_form.is_valid():
+                instance = cover_sheet_form.save(commit=False)
+                filepath = request.FILES.get('organization_logo_input', False)
+
+                if filepath:
+                    instance.organization_logo = filepath.read()
+                else:
+                    if instance.organization_logo:
+                        instance.organization_logo = instance.organization_logo
+                    else:
+                        instance.organization_logo = None
+            instance.save()
+        else:
+            cover_sheet_form = cover_sheet_wsdot_review(instance=cover_sheet.objects.get(organization_id=organization_id))
+        try:
+            base64_logo = base64.encodebytes(cover_sheet.objects.get(organization_id=organization_id).organization_logo).decode("utf-8")
+        except:
+            base64_logo = ""
+
         organization_notes = cover_sheet_review_notes.objects.filter(year=year,
                                                                      summary_report_status=summary_report_status.objects.get(organization_id=organization_id),
                                                                      note_area='Organization')
@@ -1535,6 +1562,12 @@ def wsdot_review_cover_sheets(request, year=None, organization_id=None):
                                                                 summary_report_status=summary_report_status.objects.get(
                                                                     organization_id=organization_id),
                                                                 note_area='Service')
+        child_notes = cover_sheet_review_notes.objects.filter(year=year,
+                                                              summary_report_status=summary_report_status.objects.get(
+                                                                  organization_id=organization_id),
+                                                              parent_note__isnull=False)
+
+
         new_note_form = add_cover_sheet_review_note()
 
     else:
@@ -1555,12 +1588,22 @@ def wsdot_review_cover_sheets(request, year=None, organization_id=None):
                    'cover_sheet_form': cover_sheet_form,
                    'organization_notes': organization_notes,
                    'service_notes': service_notes,
-                   'new_note_form': new_note_form})
+                   'child_notes': child_notes,
+                   'new_note_form': new_note_form,
+                   'published_version': cover_sheet.objects.get(organization_id=organization_id).published_version,
+                   'base64_logo': base64_logo})
+
+
+# TODO Come back through and change this to be object oriented code about a notes object.
+@login_required(login_url='/Panacea/login')
+def base_note(request):
+    # this is used to build the base url to submit a new note it is never actually called.
+    raise PermissionError
 
 
 @login_required(login_url='/Panacea/login')
 @group_required('WSDOT staff')
-def add_cover_sheet_note_wsdot(request, year, summary_report_status_id, note_area):
+def add_cover_sheet_note_wsdot(request, year, summary_report_status_id, note_area, note_field):
 
     print(note_area)
     print(cover_sheet_review_notes.NOTE_AREAS)
@@ -1572,10 +1615,52 @@ def add_cover_sheet_note_wsdot(request, year, summary_report_status_id, note_are
         instance.summary_report_status_id = summary_report_status_id
         instance.wsdot_note = True
         instance.note_area = note_area
+        instance.note_field = note_field
         instance.custom_user = request.user
         instance.save()
     url = reverse('wsdot_review_cover_sheets_year_org', kwargs={'year': year,
                                                                 'organization_id': summary_report_status.objects.get(id=summary_report_status_id).organization_id})
+    return HttpResponseRedirect(url)
+
+def add_cover_sheet_child_note_wsdot(request, parent_note):
+    parent_note = cover_sheet_review_notes.objects.get(id=parent_note)
+    if request.POST:
+        form = add_cover_sheet_review_note(request.POST)
+        instance = form.save(commit=False)
+        instance.year = parent_note.year
+        instance.summary_report_status_id = parent_note.summary_report_status_id
+        instance.wsdot_note = True
+        instance.note_area = parent_note.note_area
+        instance.note_field = parent_note.note_field
+        instance.custom_user = request.user
+        instance.parent_note = parent_note.id
+        instance.save()
+    url = reverse('wsdot_review_cover_sheets_year_org', kwargs={'year': parent_note.year,
+                                                                'organization_id': summary_report_status.objects.get(
+                                                                    id=parent_note.summary_report_status_id).organization_id})
+    return HttpResponseRedirect(url)
+
+
+@login_required(login_url='/Panacea/login')
+def add_cover_sheet_note_customer(request, year, note_area, note_field):
+    if note_area == "Organization":
+        url = reverse('cover_sheets_organization')
+    elif note_area == "Service":
+        url = reverse('cover_sheets_service')
+    else:
+        raise PermissionError
+
+
+    if request.POST:
+        form = add_cover_sheet_review_note(request.POST)
+        instance = form.save(commit=False)
+        instance.year = year
+        instance.summary_report_status_id = summary_report_status.objects.get(organization_id=find_user_organization_id(request.user.id), year=year).id
+        instance.wsdot_note = False
+        instance.note_area = note_area
+        instance.custom_user = request.user
+        instance.save()
+
     return HttpResponseRedirect(url)
 
 
@@ -1584,13 +1669,24 @@ def delete_cover_sheet_note(request, note_id):
     note = cover_sheet_review_notes.objects.get(id=note_id)
     note_year = note.year
     note_organization_id = summary_report_status.objects.get(id=note.summary_report_status_id).organization_id
+
+    if note.wsdot_note:
+        url = reverse('wsdot_review_cover_sheets_year_org', kwargs={'year': note_year,
+                                                                    'organization_id': note_organization_id})
+    else:
+        if note.note_area == "Organization":
+            url = reverse('cover_sheets_organization')
+        elif note.note_area == "Service":
+            url = reverse('cover_sheets_service')
+        else:
+            raise PermissionError
+
     if not note.custom_user == request.user:
         raise PermissionError
     else:
         note.delete()
 
-    url = reverse('wsdot_review_cover_sheets_year_org', kwargs={'year': note_year,
-                                                                'organization_id': note_organization_id})
+
     return HttpResponseRedirect(url)
 
 @login_required(login_url='/Panacea/login')
@@ -1601,7 +1697,7 @@ def approve_cover_sheet(request, summary_report_status_id):
     cover_sheet_status.save()
 
     url = reverse('wsdot_review_cover_sheets_year_org', kwargs={'year': cover_sheet_status.year,
-                                                            'organization_id': cover_sheet_status.organization_id})
+                                                                'organization_id': cover_sheet_status.organization_id})
     return HttpResponseRedirect(url)
 
 
@@ -1610,7 +1706,7 @@ def approve_cover_sheet(request, summary_report_status_id):
 @group_required('WSDOT staff')
 def return_cover_sheet_to_user(request, summary_report_status_id):
     cover_sheet_status = summary_report_status.objects.get(id=summary_report_status_id)
-    cover_sheet_status.cover_sheet_status = "With customer"
+    cover_sheet_status.cover_sheet_status = "With user"
     cover_sheet_status.save()
 
     url = reverse('wsdot_review_cover_sheets_year_org', kwargs={'year': cover_sheet_status.year,
@@ -1626,7 +1722,18 @@ def wsdot_review_data(request):
         pass
     else:
         pass
-    return render(request, 'pages/summary/admin/wsdo_review_data.html')
+    return render(request, 'pages/summary/admin/wsdot_review_data.html')
+
+
+@login_required(login_url='/Panacea/login')
+def customer_review_cover_sheets(request):
+
+    return render(request, 'pages/summary/customer_review_cover_sheet.html')
+
+
+@login_required(login_url='/Panacea/login')
+def customer_review_cover_sheets(request):
+    return render(request, 'pages/summary/customer_review_cover_sheet.html')
 
 
 @login_required(login_url='/Panacea/login')

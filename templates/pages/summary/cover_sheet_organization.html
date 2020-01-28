@@ -12,12 +12,6 @@
 {% block content %}
 
     <div class="container-fluid">
-
-        <!-- Page Heading -->
-
-    </div>
-
-    <div class="container-fluid">
         <div class="row">
             <div class="card shadow mb-4 w-100">
                 <div class="card-header">
@@ -176,5 +170,17 @@
             })
         })
 
+    </script>
+
+    <script>
+        $(function(){
+            $('input[type="url"]').on('blur', function(){
+                var string = $(this).val();
+                if (!string.match(/^https?:/) && string.length) {
+                    string = "http://" + string;
+                    $(this).val(string)
+                }
+            });
+        });
     </script>
 {% endblock %}

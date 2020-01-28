@@ -486,12 +486,36 @@ class cover_sheet(models.Model):
     monorail_ownership = models.CharField(max_length=250, blank=True, null=True)
     community_planning_region = models.CharField(max_length=50, blank=True, null=True)
     organization_logo = models.BinaryField(editable=True, blank=True, null=True)
+    published_version = models.BooleanField(blank=True, null=True, default=True)
     history = HistoricalRecords()
 
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=['organization'], name="unique_organization")
         ]
+
+    def is_identical_to_published_version(self):
+        db_record = cover_sheet.objects.get(id=self.id)
+        print(self.id)
+        published_record = cover_sheet.history.filter(id=self.id, published_version=True).order_by('-history_date').first()
+        if not published_record:
+            if db_record.published_version:
+                print('using db_record')
+                published_record = db_record
+            else:
+                return False
+
+        new_values = [(k, v) for k, v in self.__dict__.items() if k != '_state' and k != "published_version"]
+        equals_published_record = True
+        for key, value in new_values:
+            if not published_record.__dict__[key] == value:
+                equals_published_record = False
+
+        return equals_published_record
+
+    def save(self, *args, **kwargs):
+        self.published_version = self.is_identical_to_published_version()
+        super(cover_sheet, self).save(*args, **kwargs)
 
 
 class service_offered(models.Model):
@@ -561,9 +585,14 @@ class cover_sheet_review_notes(models.Model):
     summary_report_status = models.ForeignKey(summary_report_status, on_delete=models.PROTECT)
     note = models.TextField(blank=True, null=True)
     note_area = models.CharField(max_length=80, choices=NOTE_AREAS)
+    note_field = models.CharField(max_length=80, blank=True, null=True)
     wsdot_note = models.BooleanField(default=True)
+    parent_note = models.IntegerField(blank=True, null=True)
     custom_user = models.ForeignKey(custom_user, on_delete=models.PROTECT, blank=True, null=True)
     date = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+
+
+
 
 # class ending_balance_categories(models.Model):
 #     ending_balance_category = models.CharField(max_length=100, blank=False, null = False)
