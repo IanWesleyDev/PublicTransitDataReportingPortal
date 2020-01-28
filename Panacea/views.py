@@ -1732,8 +1732,14 @@ def customer_review_cover_sheets(request):
 
 
 @login_required(login_url='/Panacea/login')
-def customer_review_cover_sheets(request):
+def customer_review_data(request):
     return render(request, 'pages/summary/customer_review_cover_sheet.html')
+
+
+@login_required(login_url='/Panacea/login')
+def customer_review_instructions(request):
+    return render(request, 'pages/summary/customer_review_instructions.html')
+
 
 
 @login_required(login_url='/Panacea/login')

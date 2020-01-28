@@ -15,9 +15,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+
 from Panacea import views
 from Panacea import views_SAML
-from django.conf.urls import url
 
 urlpatterns = [
     # # These are the SAML2 related URLs. You can change "^saml2_auth/" regex to
@@ -101,6 +101,8 @@ urlpatterns = [
     path('summary/admin/wsdot_review_cover_sheet/return_cover_sheet_to_user/<int:summary_report_status_id>', views.return_cover_sheet_to_user, name="return_cover_sheet_to_user"),
     path('summary/admin/review_cover_sheets', views.wsdot_review_data, name="wsdot_review_data"),
     path('summary/review_organization_information', views.customer_review_cover_sheets, name="customer_review_cover_sheets"),
+    path('summary/customer_review_data', views.customer_review_data, name="customer_review_data"),
+    path('summary/customer_review_instructions', views.customer_review_instructions, name="customer_review_instructions"),
     path('logged_in/', views.your_logged_in, name='your_logged_in'),
     path('login_denied/', views.login_denied, name='login_denied'),
     path('sso/wsdot/', views_SAML.signin, name="wsdot_sso"),
