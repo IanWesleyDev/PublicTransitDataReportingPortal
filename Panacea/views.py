@@ -1622,6 +1622,8 @@ def add_cover_sheet_note_wsdot(request, year, summary_report_status_id, note_are
                                                                 'organization_id': summary_report_status.objects.get(id=summary_report_status_id).organization_id})
     return HttpResponseRedirect(url)
 
+
+@login_required(login_url='/Panacea/login')
 def add_cover_sheet_child_note_wsdot(request, parent_note):
     parent_note = cover_sheet_review_notes.objects.get(id=parent_note)
     if request.POST:
@@ -1642,6 +1644,24 @@ def add_cover_sheet_child_note_wsdot(request, parent_note):
 
 
 @login_required(login_url='/Panacea/login')
+def add_cover_sheet_child_note_customer(request, parent_note):
+    parent_note = cover_sheet_review_notes.objects.get(id=parent_note)
+    if request.POST:
+        form = add_cover_sheet_review_note(request.POST)
+        instance = form.save(commit=False)
+        instance.year = parent_note.year
+        instance.summary_report_status_id = parent_note.summary_report_status_id
+        instance.wsdot_note = False
+        instance.note_area = parent_note.note_area
+        instance.note_field = parent_note.note_field
+        instance.custom_user = request.user
+        instance.parent_note = parent_note.id
+        instance.save()
+    url = reverse('customer_review_cover_sheets')
+    return HttpResponseRedirect(url)
+
+
+@login_required(login_url='/Panacea/login')
 def add_cover_sheet_note_customer(request, year, note_area, note_field):
     if note_area == "Organization":
         url = reverse('cover_sheets_organization')
@@ -1658,6 +1678,7 @@ def add_cover_sheet_note_customer(request, year, note_area, note_field):
         instance.summary_report_status_id = summary_report_status.objects.get(organization_id=find_user_organization_id(request.user.id), year=year).id
         instance.wsdot_note = False
         instance.note_area = note_area
+        instance.note_area = note_field
         instance.custom_user = request.user
         instance.save()
 
@@ -1675,9 +1696,9 @@ def delete_cover_sheet_note(request, note_id):
                                                                     'organization_id': note_organization_id})
     else:
         if note.note_area == "Organization":
-            url = reverse('cover_sheets_organization')
+            url = reverse('customer_review_cover_sheets')
         elif note.note_area == "Service":
-            url = reverse('cover_sheets_service')
+            url = reverse('customer_review_cover_sheets')
         else:
             raise PermissionError
 
@@ -1727,8 +1748,25 @@ def wsdot_review_data(request):
 
 @login_required(login_url='/Panacea/login')
 def customer_review_cover_sheets(request):
+    year = get_current_summary_report_year()
+    organization_id = find_user_organization_id(request.user.id)
+    org_summary_report_status = summary_report_status.objects.get(year=year, organization_id=organization_id)
 
-    return render(request, 'pages/summary/customer_review_cover_sheet.html')
+    notes = cover_sheet_review_notes.objects.filter(year=year,
+                                                    summary_report_status=summary_report_status.objects.get(organization_id=organization_id),
+                                                    parent_note__isnull=True).exclude(note_status="Closed")
+    child_notes = cover_sheet_review_notes.objects.filter(year=year,
+                                                          summary_report_status=summary_report_status.objects.get(organization_id=organization_id),
+                                                          parent_note__isnull=False)
+    new_note_form = add_cover_sheet_review_note()
+
+
+    return render(request, 'pages/summary/customer_review_cover_sheet.html', {'year': year,
+                                                                              'organization_id': organization_id,
+                                                                              'org_summary_report_status': org_summary_report_status,
+                                                                              'notes': notes,
+                                                                              'child_notes': child_notes,
+                                                                              'new_note_form': new_note_form})
 
 
 @login_required(login_url='/Panacea/login')
@@ -1740,6 +1778,22 @@ def customer_review_data(request):
 def customer_review_instructions(request):
     return render(request, 'pages/summary/customer_review_instructions.html')
 
+@login_required(login_url='/Panacea/login')
+def accept_wsdot_edit(request, note_id):
+
+    note = cover_sheet_review_notes.objects.get(id=note_id)
+    note.note_status = "Closed"
+    note.save()
+    unresolved_notes_count = cover_sheet_review_notes.objects.filter(summary_report_status=note.summary_report_status, parent_note__isnull=True).exclude(note_status="Closed").count()
+    if unresolved_notes_count == 0:
+        report_status = summary_report_status.objects.get(id=note.summary_report_status_id)
+        report_status.cover_sheet_status = "With WSDOT"
+        report_status.cover_sheet_submitted_for_review = True
+        report_status.save()
+
+
+    url = reverse('customer_review_cover_sheets')
+    return HttpResponseRedirect(url)
 
 
 @login_required(login_url='/Panacea/login')

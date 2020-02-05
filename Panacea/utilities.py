@@ -138,7 +138,6 @@ def generate_summary_report_years():
     return reportYears
 
 def find_user_organization_id(id):
-    print(id)
     user_profile_data = profile.objects.get(custom_user=id)
     org = user_profile_data.organization_id
     return org

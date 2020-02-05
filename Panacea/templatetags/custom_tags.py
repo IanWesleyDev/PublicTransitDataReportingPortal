@@ -1,6 +1,6 @@
 from django import template
 from django.conf import settings
-from Panacea.models import organization, transit_mode
+from Panacea.models import organization, transit_mode, summary_report_status, cover_sheet
 
 register = template.Library()
 
@@ -147,7 +147,7 @@ def transit_mode_from_id(transit_mode_id):
 
 @register.simple_tag
 def define(val=None):
-  return val
+    return val
 
 @register.filter
 def get_AutoNumeric_mask_type(metric):
@@ -166,3 +166,52 @@ def get_form_labels(i, labels):
 @register.simple_tag
 def get_masking_class(i, masking_class):
     return masking_class[i]
+
+
+@register.simple_tag(name='cover_sheet_note_previous_value')
+def cover_sheet_note_previous_value(note):
+    note_field = note.note_field
+    if note_field == "organization_logo_input":
+        return "NA"
+
+    current_summary_report_status = summary_report_status.objects.get(id=note.summary_report_status_id)
+
+    if note_field == "executive_officer_last_name":
+        last_cover_sheet = cover_sheet.history.filter(organization_id=current_summary_report_status.organization_id). \
+            exclude(history_user__profile__organization_id=1).order_by('-history_date').first()
+
+        return last_cover_sheet.executive_officer_first_name + ' ' + last_cover_sheet.executive_officer_last_name
+
+    else:
+        last_cover_sheet = cover_sheet.history.filter(organization_id=current_summary_report_status.organization_id). \
+            exclude(history_user__profile__organization_id=1).order_by('-history_date').first().__dict__[note_field]
+
+    return last_cover_sheet
+
+@register.simple_tag(name='cover_sheet_note_current_value')
+def cover_sheet_note_current_value(note):
+    note_field = note.note_field
+    if note_field == "organization_logo_input":
+        return "NA"
+
+    current_summary_report_status = summary_report_status.objects.get(id=note.summary_report_status_id)
+
+    if note_field == "executive_officer_last_name":
+        current_cover_sheet = cover_sheet.objects.get(organization_id=current_summary_report_status.organization_id)
+
+        return current_cover_sheet.executive_officer_first_name + ' ' + current_cover_sheet.executive_officer_last_name
+
+    else:
+        current_cover_sheet = cover_sheet.objects.get(organization_id=current_summary_report_status.organization_id).__dict__[note_field]
+
+    return current_cover_sheet
+
+
+@register.simple_tag(name='get_cover_sheet_field_name_verbose')
+def get_cover_sheet_field_name_verbose(field_name):
+    if field_name == "organization_logo_input":
+        return "organization logo"
+    elif field_name == "executive_officer_last_name":
+        return "executive officer name"
+
+    return cover_sheet._meta.get_field(field_name).verbose_name

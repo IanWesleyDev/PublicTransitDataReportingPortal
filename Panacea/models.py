@@ -581,6 +581,12 @@ class cover_sheet_review_notes(models.Model):
         ("Service", "Service"),
     )
 
+    NOTE_STATUS = (
+        ("Open", "Open"),
+        ("Closed", "Closed"),
+        ("Waiting", "Waiting"),
+    )
+
     year = models.IntegerField()
     summary_report_status = models.ForeignKey(summary_report_status, on_delete=models.PROTECT)
     note = models.TextField(blank=True, null=True)
@@ -588,11 +594,21 @@ class cover_sheet_review_notes(models.Model):
     note_field = models.CharField(max_length=80, blank=True, null=True)
     wsdot_note = models.BooleanField(default=True)
     parent_note = models.IntegerField(blank=True, null=True)
+    note_status = models.CharField(max_length=50, choices=NOTE_STATUS, default="Open")
     custom_user = models.ForeignKey(custom_user, on_delete=models.PROTECT, blank=True, null=True)
     date = models.DateTimeField(auto_now_add=True, blank=True, null=True)
 
+    def save(self, *args, **kwargs):
+        if not self.id:
+            if self.parent_note:
+                parent_note = cover_sheet_review_notes.objects.get(id=self.parent_note)
+                if self.wsdot_note:
+                    parent_note.note_status = "Open"
+                else:
+                    parent_note.note_status = "Waiting"
+                parent_note.save()
 
-
+        super(cover_sheet_review_notes, self).save(*args, **kwargs)
 
 # class ending_balance_categories(models.Model):
 #     ending_balance_category = models.CharField(max_length=100, blank=False, null = False)
