@@ -47,10 +47,11 @@ from .forms import CustomUserCreationForm, \
 from .models import profile, vanpool_report, custom_user, vanpool_expansion_analysis, organization, cover_sheet, \
     revenue, transit_data, expense, expense_source, service_offered, revenue_source, \
     transit_metrics, transit_mode, fund_balance, fund_balance_type, validation_errors, \
-    summary_report_status, cover_sheet_review_notes
+    summary_report_status, cover_sheet_review_notes, summary_organization_progress
 from .utilities import calculate_latest_vanpool, find_maximum_vanpool, calculate_remaining_months, \
     calculate_if_goal_has_been_reached, \
-    find_user_organization_id, find_user_organization
+    find_user_organization_id, find_user_organization, get_all_cover_sheet_steps_completed, \
+    get_cover_sheet_submitted
 from .utilities import monthdelta, get_wsdot_color, get_vanpool_summary_charts_and_table, percent_change_calculation, \
     find_vanpool_organizations, get_current_summary_report_year, filter_revenue_sheet_by_classification, \
     complete_data, green_house_gas_per_sov_mile, green_house_gas_per_vanpool_mile, \
@@ -285,6 +286,13 @@ def OrganizationProfile(request, redirect_to=None):
             form.save()
             if redirect_to:
                 print(redirect_to)
+                if redirect_to == "organizational_information":
+                    summary_progress, created = summary_organization_progress.objects.get_or_create(
+                        organization=find_user_organization(request.user.id))
+                    summary_progress.address_and_organization = True
+                    summary_progress.save()
+                    return redirect("cover_sheets_organization")
+
                 return redirect(redirect_to)
             else:
                 return redirect('OrganizationProfile')
@@ -775,7 +783,17 @@ def Operation_Summary(request):
 @login_required(login_url='/Panacea/login')
 @group_required('Summary reporter', 'WSDOT staff')
 def summary_instructions(request):
-    return render(request, 'pages/summary/summary_instructions.html', {})
+    user_org = find_user_organization(request.user.id)
+    print(get_cover_sheet_submitted(user_org.id))
+    if get_cover_sheet_submitted(user_org.id):
+        return redirect('cover_sheet_submitted')
+
+    summary_progress, created = summary_organization_progress.objects.get_or_create(organization=user_org)
+    summary_progress.started = True
+    summary_progress.save()
+    ready_to_submit = get_all_cover_sheet_steps_completed(user_org.id)
+
+    return render(request, 'pages/summary/summary_instructions.html', {'ready_to_submit': ready_to_submit})
 
 
 @login_required(login_url='/Panacea/login')
@@ -787,16 +805,16 @@ def organizational_information(request):
     form = organization_profile(instance=org)
     if request.POST:
         if form.is_valid():
+            # most times this form get submitted to the OrganizationProfile view so this is never called
             form.save()
+
             return redirect('organizational_information')
 
-    return render(request, 'pages/summary/organizational_information.html', {'org_name': org_name, 'form': form})
+    ready_to_submit = get_all_cover_sheet_steps_completed(org.id)
 
-
-@login_required(login_url='/Panacea/login')
-@group_required('Summary reporter', 'WSDOT staff')
-def ntd_upload(request):
-    return render(request, 'pages/summary/ntd_upload.html', {})
+    return render(request, 'pages/summary/organizational_information.html', {'org_name': org_name,
+                                                                             'form': form,
+                                                                             'ready_to_submit': ready_to_submit})
 
 
 @login_required(login_url='/Panacea/login')
@@ -820,7 +838,7 @@ def cover_sheet_organization_view(request):
         if form.is_valid():
             instance = form.save(commit=False)
             filepath = request.FILES.get('organization_logo_input', False)
-
+            # TODO correct this view now that it redirects to the next page if it is submitted
             if filepath:
                 instance.organization_logo = filepath.read()
                 base64_logo = base64.encodebytes(instance.organization_logo).decode("utf-8")
@@ -831,13 +849,20 @@ def cover_sheet_organization_view(request):
                     instance.organization_logo = None
 
             instance.save()
+            summary_progress, created = summary_organization_progress.objects.get_or_create(
+                organization=find_user_organization(request.user.id))
+            summary_progress.organization_details = True
+            summary_progress.save()
+            return redirect('cover_sheets_service')
 
+    ready_to_submit = get_all_cover_sheet_steps_completed(org.id)
     return render(request, 'pages/summary/cover_sheet_organization.html', {'form': form,
                                                                            'org_name': org_name,
                                                                            'base64_logo': base64_logo,
                                                                            'year': get_current_summary_report_year(),
                                                                            'notes': notes,
-                                                                           'new_note_form': new_note_form})
+                                                                           'new_note_form': new_note_form,
+                                                                           'ready_to_submit': ready_to_submit})
 
 
 @login_required(login_url='/Panacea/login')
@@ -850,6 +875,7 @@ def cover_sheet_service_view(request):
     cover_sheet_instance, created = cover_sheet.objects.get_or_create(organization=org)
 
     form = cover_sheet_service(instance=cover_sheet_instance)
+    ready_to_submit = get_all_cover_sheet_steps_completed(org.id)
 
     if request.POST:
         form = cover_sheet_service(data=request.POST, instance=cover_sheet_instance)
@@ -857,12 +883,58 @@ def cover_sheet_service_view(request):
         if form.is_valid():
             print("valid")
             form.save()
+            summary_progress, created = summary_organization_progress.objects.get_or_create(
+                organization=find_user_organization(request.user.id))
+            summary_progress.service_cover_sheet = True
+            summary_progress.save()
+
+            return redirect('submit_cover_sheet')
         else:
             print("Error")
             for error in form.errors:
                 print(error)
 
-    return render(request, 'pages/summary/cover_sheet_service.html', {'service_type': service_type, 'form': form})
+    return render(request, 'pages/summary/cover_sheet_service.html', {'service_type': service_type,
+                                                                      'form': form,
+                                                                      'ready_to_submit': ready_to_submit})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def submit_cover_sheet(request):
+    return render(request, 'pages/summary/submit_cover_sheet.html', {})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def submit_cover_sheet_submit(request):
+    user_org = find_user_organization(request.user.id)
+    ready_to_submit = get_all_cover_sheet_steps_completed(user_org.id)
+    if not ready_to_submit:
+        raise Http404("Your coversheet is not ready to be submitted. Please go through each tab and confirm your data has been updated.")
+
+    report_status = summary_report_status.objects.get(year=get_current_summary_report_year(), organization=user_org)
+    report_status.cover_sheet_submitted_for_review = True
+    report_status.cover_sheet_status = "With WSDOT"
+    report_status.save()
+
+    return redirect('summary_report_data')
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def cover_sheet_submitted(request):
+
+    cover_sheet_status = summary_report_status.objects.get(year=get_current_summary_report_year(), organization=find_user_organization(request.user.id)).cover_sheet_status
+    print(cover_sheet_status)
+
+    return render(request, 'pages/summary/cover_sheet_submitted.html', {'cover_sheet_status': cover_sheet_status})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def ntd_upload(request):
+    return render(request, 'pages/summary/ntd_upload.html', {})
 
 
 @login_required(login_url='/Panacea/login')

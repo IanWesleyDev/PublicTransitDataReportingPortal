@@ -3,7 +3,8 @@ import json
 
 from django_pandas.io import read_frame
 import pandas as pd
-from .models import organization, vanpool_expansion_analysis, vanpool_report, profile, transit_data, service_offered, transit_mode, revenue
+from .models import organization, vanpool_expansion_analysis, vanpool_report, profile, transit_data, service_offered, \
+    transit_mode, revenue, summary_organization_progress, summary_report_status
 from django.db.models import Max, Subquery, F, OuterRef, Case, CharField, Value, When, Sum, Count, Avg, FloatField, \
     ExpressionWrapper
 from django.db.models.functions import Coalesce
@@ -533,5 +534,16 @@ class Echo:
         return value
 
 
+def get_all_cover_sheet_steps_completed(organization_id):
+    organization_progress, created = summary_organization_progress.objects.get_or_create(organization_id=organization_id)
+    result = organization_progress.started and \
+             organization_progress.address_and_organization and \
+             organization_progress.organization_details and \
+             organization_progress.service_cover_sheet
+
+    return result
 
 
+def get_cover_sheet_submitted(organization_id):
+
+    return summary_report_status.objects.get(year=get_current_summary_report_year(), organization_id=organization_id).cover_sheet_submitted_for_review

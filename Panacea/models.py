@@ -573,6 +573,19 @@ class summary_report_status(models.Model):
     class Meta:
         unique_together = ('year', 'organization',)
 
+class summary_organization_progress(models.Model):
+
+    organization = models.ForeignKey(organization, on_delete=models.PROTECT)
+    started = models.BooleanField(default=False)
+    address_and_organization = models.BooleanField(default=False)
+    organization_details = models.BooleanField(default=False)
+    service_cover_sheet = models.BooleanField(default=False)
+    confirm_service = models.BooleanField(default=False)
+    transit_data = models.BooleanField(default=False)
+    revenue = models.BooleanField(default=False)
+    expenses = models.BooleanField(default=False)
+    ending_balances = models.BooleanField(default=False)
+
 
 class cover_sheet_review_notes(models.Model):
     NOTE_AREAS = (
