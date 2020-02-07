@@ -441,6 +441,11 @@ class transit_data(models.Model):
     comments = models.TextField(blank=True, null=True)
     history = HistoricalRecords()
 
+    #TODO make this contraint work
+
+    # class Meta:
+    #     unique_together = ['year', 'transit_mode', 'transit_metric', 'organization', 'administration_of_mode']
+
 
 class fund_balance_type(models.Model):
     name = models.CharField(max_length=100)
@@ -537,7 +542,6 @@ class depreciation(models.Model):
     history = HistoricalRecords()
 
 
-
 class validation_errors(models.Model):
     DO_OR_PT = (
         ('Direct Operated', 'Direct Operated'),
@@ -572,6 +576,7 @@ class summary_report_status(models.Model):
 
     class Meta:
         unique_together = ('year', 'organization',)
+
 
 class summary_organization_progress(models.Model):
 

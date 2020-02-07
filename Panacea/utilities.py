@@ -1,6 +1,7 @@
 import calendar
 import json
 
+from django.db import transaction
 from django_pandas.io import read_frame
 import pandas as pd
 from .models import organization, vanpool_expansion_analysis, vanpool_report, profile, transit_data, service_offered, \
@@ -545,5 +546,36 @@ def get_all_cover_sheet_steps_completed(organization_id):
 
 
 def get_cover_sheet_submitted(organization_id):
-
     return summary_report_status.objects.get(year=get_current_summary_report_year(), organization_id=organization_id).cover_sheet_submitted_for_review
+
+
+def get_all_data_steps_completed(organization_id):
+    organization_progress, created = summary_organization_progress.objects.get_or_create(organization_id=organization_id)
+    result = organization_progress.confirm_service and \
+             organization_progress.transit_data and \
+             organization_progress.revenue and \
+             organization_progress.expenses and \
+             organization_progress.ending_balances
+
+    return result
+
+def get_data_submitted(organization_id):
+    return summary_report_status.objects.get(year=get_current_summary_report_year(),
+                                             organization_id=organization_id).data_report_submitted_for_review
+
+@transaction.atomic
+def reset_summary_reporter_tracking(year):
+    year_reports = summary_report_status.objects.filter(year=year)
+    for item in year_reports:
+        item.cover_sheet_status = "With user"
+        item.cover_sheet_submitted_for_review = False
+        item.data_report_status = "With user"
+        item.data_report_submitted_for_review = False
+        item.save()
+
+
+@transaction.atomic
+def reset_all_orgs_summary_progress():
+    for item in summary_organization_progress.objects.all():
+        item.delete()
+

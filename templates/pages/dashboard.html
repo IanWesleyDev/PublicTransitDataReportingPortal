@@ -6,22 +6,22 @@
         <!-- Page Heading -->
         <h1 class="h3 mb-2 text-gray-800" align = "center">Dashboard</h1>
 
-    {%  if vp_program  == False%}
-        <div class="col-xl-12 col-md-12 mb-4">
-                    <div class="card border-left-primary shadow h-100 py-2">
-                        <div class="card-body">
-                            <div class="row no-gutters align-items-center">
-                                <div class="col mr-2">
+        {%  if vp_program  == False%}
+            <div class="col-xl-12 col-md-12 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
 
-      <div> Welcome to the Vanpool Reporting Portal. Please check out the reporting and setting functions. </div>
-                                </div>
-                            </div>
+                            <div> Welcome to the Vanpool Reporting Portal. Please check out the reporting and setting functions. </div>
                         </div>
                     </div>
-    {% endif %}
+                </div>
+            </div>
+        {% endif %}
 
 
-        {% if request.user|has_group:"Vanpool reporter" and user_org != 1 %}
+        {% if request.user|has_group:"Vanpool reporter" and user_org != 1 and vp_program != False %}
             <div class="row">
                 <!-- Groups In Operation -->
                 <div class="col-xl-3 col-md-6 mb-4">
@@ -73,7 +73,7 @@
                 </div>
 
                 <!-- Average Riders Per Van -->
-               <div class="col-xl-3 col-md-6 mb-4">
+                <div class="col-xl-3 col-md-6 mb-4">
                     <div class="card border-left-info shadow h-100 py-2">
                         <div class="card-body">
                             <div class="row no-gutters align-items-center">
@@ -88,7 +88,7 @@
                         </div>
                     </div>
                 </div>
-           <div class="col-xl-3 col-md-6 mb-4">
+                <div class="col-xl-3 col-md-6 mb-4">
                     <div class="card border-left-primary shadow h-100 py-2">
                         <div class="card-body">
                             <div class="row no-gutters align-items-center">
@@ -120,5 +120,5 @@
                 </div>
             {% endif %}
         {% endif %}
-    </div>
+        </div>
 {% endblock %}

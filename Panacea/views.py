@@ -51,7 +51,8 @@ from .models import profile, vanpool_report, custom_user, vanpool_expansion_anal
 from .utilities import calculate_latest_vanpool, find_maximum_vanpool, calculate_remaining_months, \
     calculate_if_goal_has_been_reached, \
     find_user_organization_id, find_user_organization, get_all_cover_sheet_steps_completed, \
-    get_cover_sheet_submitted
+    get_cover_sheet_submitted, get_all_data_steps_completed, get_data_submitted, reset_summary_reporter_tracking, \
+    reset_all_orgs_summary_progress
 from .utilities import monthdelta, get_wsdot_color, get_vanpool_summary_charts_and_table, percent_change_calculation, \
     find_vanpool_organizations, get_current_summary_report_year, filter_revenue_sheet_by_classification, \
     complete_data, green_house_gas_per_sov_mile, green_house_gas_per_vanpool_mile, \
@@ -784,7 +785,6 @@ def Operation_Summary(request):
 @group_required('Summary reporter', 'WSDOT staff')
 def summary_instructions(request):
     user_org = find_user_organization(request.user.id)
-    print(get_cover_sheet_submitted(user_org.id))
     if get_cover_sheet_submitted(user_org.id):
         return redirect('cover_sheet_submitted')
 
@@ -924,10 +924,7 @@ def submit_cover_sheet_submit(request):
 @login_required(login_url='/Panacea/login')
 @group_required('Summary reporter', 'WSDOT staff')
 def cover_sheet_submitted(request):
-
     cover_sheet_status = summary_report_status.objects.get(year=get_current_summary_report_year(), organization=find_user_organization(request.user.id)).cover_sheet_status
-    print(cover_sheet_status)
-
     return render(request, 'pages/summary/cover_sheet_submitted.html', {'cover_sheet_status': cover_sheet_status})
 
 
@@ -940,8 +937,20 @@ def ntd_upload(request):
 @login_required(login_url='/Panacea/login')
 @group_required('Summary reporter', 'WSDOT staff')
 def summary_report_data(request):
-    return render(request, 'pages/summary/summary_report_data_instructions.html')
+    user_org = find_user_organization(request.user.id)
+    if get_data_submitted(user_org.id):
+        return redirect('data_submitted')
 
+    ready_to_submit = get_all_data_steps_completed(user_org.id)
+
+    return render(request, 'pages/summary/summary_report_data_instructions.html', {'ready_to_submit': ready_to_submit})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def data_submitted(request):
+    data_status = summary_report_status.objects.get(year=get_current_summary_report_year(), organization=find_user_organization(request.user.id)).data_report_status
+    return render(request, 'pages/summary/data_submitted.html', {'data_status': data_status})
 
 @login_required(login_url='/Panacea/login')
 @group_required('Summary reporter', 'WSDOT staff')
@@ -964,7 +973,20 @@ def summary_modes(request):
         form = service_offered_form()
     print(form)
     modes = service_offered.objects.filter(organization_id=org).all()
-    return render(request, 'pages/summary/summary_modes.html', {'form': form, 'modes': modes, 'org': org})
+    ready_to_submit = get_all_data_steps_completed(find_user_organization_id(request.user.id))
+    return render(request, 'pages/summary/summary_modes.html', {'form': form,
+                                                                'modes': modes,
+                                                                'org': org,
+                                                                'ready_to_submit': ready_to_submit})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def accept_modes(request):
+    org_progress, created = summary_organization_progress.objects.get_or_create(organization=find_user_organization(request.user.id))
+    org_progress.confirm_service = True
+    org_progress.save()
+    return redirect('summary_reporting')
 
 
 @login_required(login_url='/Panacea/login')
@@ -983,100 +1005,6 @@ def delete_summary_mode(request, name, admin_of_mode):
                                                         transit_mode_id=transit_mode_id)
         service_to_delete.delete()
         return redirect('summary_modes')
-
-
-@login_required(login_url='/Panacea/login')
-@group_required('Summary reporter', 'WSDOT staff')
-def report_transit_data(request, year=None, service=None):
-    # TODO move to table
-    # def crosswalk_modes_to_rollup_modes(mode):
-    #     mode_rollup_mode_dic = {1:1, 6:6, 8:1, 11:1, 5:1, 2:2, 4:2, 7:3, 9:3, 16:4, 3:8, 10:7}
-    #     print(mode_rollup_mode_dic[mode.transit_mode_id])
-    #     return mode_rollup_mode_dic[mode.transit_mode_id]
-
-    # Function start TODO move this
-    def find_service(user_org):
-        service_offered.objects.filter(organization_id=user_org)
-        return service_offered.objects.filter(organization_id=user_org)
-
-    def get_or_create_summary_transit_queryset(my_year, my_organization, user, my_active_service):
-        classification = my_organization.summary_organization_classifications
-        classification = filter_revenue_sheet_by_classification(classification)
-        count = 0
-
-        # rollup_mode = crosswalk_modes_to_rollup_modes(my_active_service)
-        source_ids = list(transit_data.objects.filter(organization_id=user_org.id,
-                                                      year=my_year,
-                                                      administration_of_mode=my_active_service.administration_of_mode,
-                                                      transit_mode=my_active_service.transit_mode).values_list(
-            'transit_metric_id', flat=True))
-
-        all_transit_metrics = list(
-            transit_metrics.objects.filter(agency_classification=classification).values_list("id", flat=True))
-
-        source_ids = [idx for idx in source_ids if idx in all_transit_metrics]
-        if len(source_ids) != len(all_transit_metrics):
-            missing_ids = list(set(all_transit_metrics) - set(source_ids))
-            with transaction.atomic():
-                for my_id in missing_ids:
-                    transit_data.objects.create(year=my_year,
-                                                administration_of_mode=my_active_service.administration_of_mode,
-                                                transit_mode_id=my_active_service.transit_mode_id,
-                                                transit_metric_id=my_id,
-                                                organization=my_organization,
-                                                reported_value=None,
-                                                report_by=user)
-
-        qs = transit_data.objects.filter(organization_id=user_org.id,
-                                         administration_of_mode=my_active_service.administration_of_mode,
-                                         transit_mode_id=my_active_service.transit_mode_id,
-                                         year=my_year)
-        return qs.order_by('transit_mode_id', 'administration_of_mode')
-
-    # Function end
-
-    user_org = find_user_organization(request.user.id)
-
-    if year is None:
-        year = get_current_summary_report_year()
-    previous_year = year - 1
-    two_years_ago = year - 2
-    my_formset_factory = modelformset_factory(model=transit_data,
-                                              form=transit_data_form,
-                                              extra=0)
-    services = find_service(user_org)
-    if service:
-        active_service = service_offered.objects.get(id=service)
-    else:
-        active_service = services[0]
-
-    query_sets = {'this_year': get_or_create_summary_transit_queryset(year, user_org, request.user, active_service),
-                  'previous_year': get_or_create_summary_transit_queryset(previous_year, user_org, request.user,
-                                                                          active_service),
-                  'two_years_ago': get_or_create_summary_transit_queryset(two_years_ago, user_org, request.user,
-                                                                          active_service)}
-
-    formsets = {}
-    for key, value in query_sets.items():
-        formsets[key] = my_formset_factory(queryset=value, prefix=key)
-
-    # print(formset.total_form_count())
-    if request.method == 'POST':
-        for key, value in formsets.items():
-            formsets[key] = my_formset_factory(request.POST, queryset=query_sets[key], prefix=key)
-            if formsets[key].is_valid():
-                for form in formsets[key]:
-                    form.save()
-            else:
-                print(formsets[key].errors)
-
-    print(active_service)
-
-    return render(request, 'pages/summary/report_transit_data.html', {'formsets': formsets,
-                                                                      'form_range': range(len(formsets['this_year'])),
-                                                                      'services': services,
-                                                                      'active_service': active_service,
-                                                                      'year': year})
 
 
 @login_required(login_url='/Panacea/login')
@@ -1114,13 +1042,24 @@ class SummaryDataEntryConstructor:
     '''This class constructs all of the forms needed to collect summary data'''
 
     def __init__(self, report_type, target_organization, form_filter_1=None, form_filter_2=None):
+        self.REPORT_TYPES = ['transit_data', 'revenue', 'expense', 'fund_balance']
+
         self.report_type = report_type  # reports can be about revenue, transit data, expenses, and ending fund balances
         self.target_organization = target_organization  # the org submitting a report
         self.year = get_current_summary_report_year()  # TODO this function needs to be updated
         self.form_filter_1 = form_filter_1  # Forms can be filtered by the selectors at the top of the page for example reporting based on direct operated, fixed route transit
         self.form_filter_2 = form_filter_2
+        # These control how the form moves to the next form
+        self.max_form_increment = 0 #if the max increment is meet it will move to the next report type, otherwise it will go to the next set of filters
+        self.current_increment = 0
 
         self.set_default_form_filters()  # sets the starting filters for the form
+        self.set_max_form_increment()
+        self.nav_filter_count, self.nav_filters = self.get_header_navigation()
+        self.set_current_increment()
+
+        print(self.current_increment)
+
 
     def set_default_form_filters(self):
         if self.form_filter_1 is not None:
@@ -1133,8 +1072,7 @@ class SummaryDataEntryConstructor:
             elif self.report_type == "transit_data":
                 # TODO Make this into something that makes more sense
                 self.form_filter_1 = service_offered.objects.filter(organization=self.target_organization).order_by('transit_mode__name').values_list('transit_mode__name').first()[0]
-                self.form_filter_2 = service_offered.objects.filter(organization=self.target_organization).order_by(
-                    'administration_of_mode').values_list('administration_of_mode').first()[0]
+                self.form_filter_2 = service_offered.objects.filter(organization=self.target_organization).order_by('transit_mode__name').values_list('administration_of_mode').first()[0]
                 # self.form_filter_1 = self.get_model().objects.filter(organization=self.target_organization).order_by(
                 #     'transit_mode__name').values_list('transit_mode__name').first()[0]
                 # self.form_filter_2 = self.get_model().objects.filter(organization=self.target_organization).order_by(
@@ -1143,7 +1081,33 @@ class SummaryDataEntryConstructor:
                 self.form_filter_1 = None
                 self.form_filter_2 = None
             else:
-                raise Http404("Report type does not exist.")
+                raise Http404("Report type does not exist. -1")
+
+    def set_max_form_increment(self):
+        '''returns the appropriate model for the given report type'''
+        if self.report_type == "revenue":
+            self.max_form_increment = 7
+        elif self.report_type == "transit_data":
+            self.max_form_increment = service_offered.objects.filter(organization=self.target_organization).count()
+        elif self.report_type == "expense":
+            self.max_form_increment = 1
+        elif self.report_type == "fund_balance":
+            self.max_form_increment = 1
+        else:
+            raise Http404("Report type does not exist. -2")
+
+    def set_current_increment(self):
+        '''returns the appropriate model for the given report type'''
+        if self.report_type == "revenue":
+            self.current_increment = self.nav_filters.index([self.form_filter_1, self.form_filter_2]) + 1
+        elif self.report_type == "transit_data":
+            self.current_increment = self.nav_filters.index([self.form_filter_1, self.form_filter_2]) + 1
+        elif self.report_type == "expense":
+            self.current_increment = 1
+        elif self.report_type == "fund_balance":
+            self.current_increment = 1
+        else:
+            raise Http404("Report type does not exist. -3")
 
     def get_model(self):
         '''returns the appropriate model for the given report type'''
@@ -1156,7 +1120,7 @@ class SummaryDataEntryConstructor:
         elif self.report_type == "fund_balance":
             return fund_balance
         else:
-            raise Http404("Report type does not exist.")
+            raise Http404("Report type does not exist. -4")
 
     def get_metric_model(self):
         '''returns the appropriate metric model for the given report type'''
@@ -1169,7 +1133,7 @@ class SummaryDataEntryConstructor:
         elif self.report_type == "fund_balance":
             return fund_balance_type
         else:
-            raise Http404("Report type does not exist.")
+            raise Http404("Report type does not exist. -5")
 
     def get_metric_model_name(self):
         '''Returns the metric model as a string.'''
@@ -1182,7 +1146,7 @@ class SummaryDataEntryConstructor:
         elif self.report_type == "fund_balance":
             return 'fund_balance_type'
         else:
-            raise Http404("Report type does not exist.")
+            raise Http404("Report type does not exist. -6")
 
     def get_metric_id_field_name(self):
         '''Returns the name of the field name of the id field in the metric model as a string.'''
@@ -1400,13 +1364,49 @@ class SummaryDataEntryConstructor:
             formset = my_formset_factory(post_data, queryset=query_sets.filter(year=self.year - i).order_by(
                 self.get_metric_id_field_name()), prefix=year_x)
             for form in formset:
-                form.save()
+                if form.is_valid():
+                    form.save()
             i += 1
+
+    def go_to_next_form(self):
+        self.current_increment = self.current_increment + 1
+        if self.current_increment > self.max_form_increment:
+            org_progress = summary_organization_progress.objects.get(organization=self.target_organization)
+            if self.report_type == 'fund_balance':
+                org_progress.ending_balances = True
+                org_progress.save()
+                if get_all_data_steps_completed(self.target_organization.id):
+                    return redirect('submit_data')
+                else:
+                    raise Http404("You are not ready to submit your data.  Please be sure you have reviewed each section.")
+            else:
+
+                if self.report_type == "revenue":
+                    org_progress.revenue = True
+                    org_progress.save()
+                elif self.report_type == "transit_data":
+                    org_progress.transit_data = True
+                    org_progress.save()
+                elif self.report_type == "expense":
+                    org_progress.expenses = True
+                    org_progress.save()
+                elif self.report_type == "fund_balance":
+                    raise Http404("Report type does not exist. -7a")
+                else:
+                    raise Http404("Report type does not exist. -7b")
+
+                new_report_type = self.REPORT_TYPES[self.REPORT_TYPES.index(self.report_type)+1]
+                print(new_report_type)
+                return redirect('summary_reporting_type', new_report_type)
+        else:
+            self.form_filter_1 = self.nav_filters[self.current_increment - 1][0]
+            self.form_filter_2 = self.nav_filters[self.current_increment - 1][1]
+            return redirect('summary_reporting_filters', self.report_type, self.form_filter_1, self.form_filter_2)
+
 
 
 class SummaryDataEntryTemplateData:
     '''Simpler wrapper around the SummaryDataEntryConstructor class which just contains only items needed in the template'''
-
     def __init__(self, constructor, report_type):
         self.formsets, self.formset_labels, self.masking_class = constructor.get_formsets_labels_and_masking_class()
         self.report_type = report_type
@@ -1415,7 +1415,8 @@ class SummaryDataEntryTemplateData:
         self.form_filter_2 = constructor.form_filter_2
         self.other_totals = constructor.get_other_measure_totals()
         self.masking_types = []
-        self.nav_filter_count, self.nav_filters = constructor.get_header_navigation()
+        self.nav_filter_count = constructor.nav_filter_count
+        self.nav_filters = constructor.nav_filters
 
         if constructor.report_type == "transit_data":
             self.show_totals = False
@@ -1435,11 +1436,30 @@ def summary_reporting(request, report_type=None, form_filter_1=None, form_filter
                                                  form_filter_2=form_filter_2)
     if request.method == 'POST':
         requested_form.save_with_post_data(request.POST)
+        return requested_form.go_to_next_form()
 
     template_data = SummaryDataEntryTemplateData(requested_form, report_type)
 
-    return render(request, 'pages/summary/summary_reporting.html', {'template_data': template_data})
+    ready_to_submit = get_all_data_steps_completed(find_user_organization_id(request.user.id))
 
+    return render(request, 'pages/summary/summary_reporting.html', {'template_data': template_data,
+                                                                    'ready_to_submit': ready_to_submit})
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def submit_data(request):
+    ready_to_submit = get_all_data_steps_completed(find_user_organization_id(request.user.id))
+    return render(request, 'pages/summary/submit_data.html', {'ready_to_submit': ready_to_submit})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def submit_data_submit(request):
+    status = summary_report_status.objects.get(year=get_current_summary_report_year(), organization=find_user_organization(request.user.id))
+    status.data_report_submitted_for_review = True
+    status.data_report_status = "With WSDOT"
+    status.save()
+    return redirect('dashboard')
 
 @login_required(login_url='/Panacea/login')
 def configure_agency_types(request, model=None):
@@ -1576,6 +1596,29 @@ def summary_tracking(request, year=None):
     print(tracking_data)
 
     return render(request, 'pages/summary/admin/summary_tracking.html', {'year': year, 'tracking_data': tracking_data})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('WSDOT staff')
+def summary_yearly_setup(request, action=None):
+
+    if action:
+        if action == "reset_summary_reporter_tracking":
+            year = get_current_summary_report_year()
+            reset_summary_reporter_tracking(year)
+        elif action == "reset_all_orgs_summary_progress":
+            reset_all_orgs_summary_progress()
+        else:
+            raise Http404("Action not found")
+
+    return render(request, 'pages/summary/admin/summary_yearly_setup.html', {})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('WSDOT staff')
+def summary_yearly_setup_instructions(request):
+    return render(request, 'pages/summary/admin/summary_yearly_setup_instructions.html', {})
+
 
 
 @login_required(login_url='/Panacea/login')
