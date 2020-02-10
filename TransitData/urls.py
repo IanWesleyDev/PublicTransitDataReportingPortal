@@ -70,6 +70,7 @@ urlpatterns = [
     path('accessibility/', views.accessibility, name='accessibility'),
     path('PublicDisclosure/', views.public_disclosure, name="public_disclosure"),
     path('summary/instructions/', views.summary_instructions, name="summary_instructions"),
+    path('summary/pick_up_where_you_left_off', views.pick_up_where_you_left_off, name="pick_up_where_you_left_off"),
     path('summary/cover_sheet_submitted/', views.cover_sheet_submitted, name="cover_sheet_submitted"),
     path('summary/organizational_information/', views.organizational_information, name="organizational_information"),
     path('summary/submit_cover_sheet/', views.submit_cover_sheet, name="submit_cover_sheet"),

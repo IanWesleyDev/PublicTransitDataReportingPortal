@@ -83,86 +83,99 @@ def index(request):
 def dashboard(request):
     current_user_profile = profile.objects.get(custom_user=request.user)
 
+    if not current_user_profile.profile_submitted:
+        return redirect('ProfileSetup')
+
+    if current_user_profile.profile_submitted and not current_user_profile.profile_complete:
+        return render(request, 'pages/ProfileComplete.html')
+
     # If the user is registered and has had permissions assigned
     if current_user_profile.profile_complete is True:
         current_user_id = request.user.id
         user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
+        user_context = {'user_org': user_org_id}
+
         if organization.objects.get(id=user_org_id).vanpool_program == False:
             vp_program = False
-            return render(request, 'pages/dashboard.html', {'user_org': user_org_id, 'vp_program': vp_program})
-        recent_vanpool_report = vanpool_report.objects. \
-            filter(organization_id=user_org_id, report_date__isnull=False). \
-            order_by('-report_year', '-report_month').first()
-        report_month = recent_vanpool_report.report_month
-        previous_report_year = recent_vanpool_report.report_year - 1
-        last_year_report = vanpool_report.objects.get(organization_id=user_org_id,
-                                                      report_year=previous_report_year,
-                                                      report_month=report_month)
+            user_context.update({'vp_program': vp_program})
+        else:
+            recent_vanpool_report = vanpool_report.objects. \
+                filter(organization_id=user_org_id, report_date__isnull=False). \
+                order_by('-report_year', '-report_month').first()
+            report_month = recent_vanpool_report.report_month
+            previous_report_year = recent_vanpool_report.report_year - 1
+            last_year_report = vanpool_report.objects.get(organization_id=user_org_id,
+                                                          report_year=previous_report_year,
+                                                          report_month=report_month)
 
-        def get_most_recent_and_change(measure):
-            """Return a list where first item is the current months stat and the second item is the year over year grouwth"""
-            current_monthly_stat = getattr(recent_vanpool_report, measure)
-            last_year_stat = getattr(last_year_report, measure)
-            if last_year_stat is None:
-                year_over_year_growth = "NA"
-            else:
-                year_over_year_growth = (current_monthly_stat / last_year_stat) - 1
-
-            return [current_monthly_stat, year_over_year_growth]
-
-        def check_status():
-            """Returns the report status (if it is past due) of the report for the report after the most recent report"""
-
-            def get_month_year_addition(month):
-                if month == 12:
-                    return -11, 1
+            def get_most_recent_and_change(measure):
+                """Return a list where first item is the current months stat and the second item is the year over year grouwth"""
+                current_monthly_stat = getattr(recent_vanpool_report, measure)
+                last_year_stat = getattr(last_year_report, measure)
+                if last_year_stat is None:
+                    year_over_year_growth = "NA"
                 else:
-                    return 1, 0
+                    year_over_year_growth = (current_monthly_stat / last_year_stat) - 1
 
-            month_add, year_add = get_month_year_addition(recent_vanpool_report.report_month)
-            next_vanpool_report_status = vanpool_report.objects.get(organization_id=user_org_id,
-                                                                    report_month=recent_vanpool_report.report_month + month_add,
-                                                                    report_year=recent_vanpool_report.report_year + year_add).status
+                return [current_monthly_stat, year_over_year_growth]
 
-            return next_vanpool_report_status
+            def check_status():
+                """Returns the report status (if it is past due) of the report for the report after the most recent report"""
 
-        def ghg_calculator():
-            current_monthly_sov = green_house_gas_per_sov_mile() * recent_vanpool_report.average_riders_per_van * (
-                    recent_vanpool_report.vanpool_miles_traveled + recent_vanpool_report.vanshare_miles_traveled)
-            current_monthly_vanpool_emissions = recent_vanpool_report.vanpool_miles_traveled * green_house_gas_per_vanpool_mile()
-            current_monthly_emissions = current_monthly_sov - current_monthly_vanpool_emissions
-            last_year_monthly_sov = green_house_gas_per_sov_mile() * last_year_report.average_riders_per_van * (
-                    last_year_report.vanpool_miles_traveled + last_year_report.vanshare_miles_traveled)
-            last_year_monthly_vanpool_emissions = (
-                                                          last_year_report.vanpool_miles_traveled + last_year_report.vanshare_miles_traveled) * green_house_gas_per_vanpool_mile()
-            last_year_monthly_emissions = last_year_monthly_sov - last_year_monthly_vanpool_emissions
+                def get_month_year_addition(month):
+                    if month == 12:
+                        return -11, 1
+                    else:
+                        return 1, 0
 
-            ghg_percent = ((current_monthly_emissions - last_year_monthly_emissions) / last_year_monthly_emissions)
-            return [round(current_monthly_emissions, 2), ghg_percent]
+                month_add, year_add = get_month_year_addition(recent_vanpool_report.report_month)
+                next_vanpool_report_status = vanpool_report.objects.get(organization_id=user_org_id,
+                                                                        report_month=recent_vanpool_report.report_month + month_add,
+                                                                        report_year=recent_vanpool_report.report_year + year_add).status
 
-        return render(request, 'pages/dashboard.html', {'user_org': user_org_id,
-                                                        'groups_in_operation': get_most_recent_and_change(
-                                                            "total_groups_in_operation"),
-                                                        'total_passenger_trips': get_most_recent_and_change(
-                                                            "total_passenger_trips"),
-                                                        'average_riders_per_van': get_most_recent_and_change(
-                                                            "average_riders_per_van"),
-                                                        'total_miles_traveled': get_most_recent_and_change(
-                                                            "total_miles_traveled"),
-                                                        'co2_emissions_avoided': ghg_calculator(),
-                                                        'report_status': check_status(),
-                                                        'report_month': report_month,
-                                                        'previous_report_year': previous_report_year,
-                                                        'last_report_year': recent_vanpool_report.report_year
-                                                        })
+                return next_vanpool_report_status
 
-    # If the user has completed their profile but has not had permissions assigned
-    elif current_user_profile.profile_submitted is True:
-        return render(request, 'pages/ProfileComplete.html')
+            def ghg_calculator():
+                current_monthly_sov = green_house_gas_per_sov_mile() * recent_vanpool_report.average_riders_per_van * (
+                        recent_vanpool_report.vanpool_miles_traveled + recent_vanpool_report.vanshare_miles_traveled)
+                current_monthly_vanpool_emissions = recent_vanpool_report.vanpool_miles_traveled * green_house_gas_per_vanpool_mile()
+                current_monthly_emissions = current_monthly_sov - current_monthly_vanpool_emissions
+                last_year_monthly_sov = green_house_gas_per_sov_mile() * last_year_report.average_riders_per_van * (
+                        last_year_report.vanpool_miles_traveled + last_year_report.vanshare_miles_traveled)
+                last_year_monthly_vanpool_emissions = (
+                                                              last_year_report.vanpool_miles_traveled + last_year_report.vanshare_miles_traveled) * green_house_gas_per_vanpool_mile()
+                last_year_monthly_emissions = last_year_monthly_sov - last_year_monthly_vanpool_emissions
 
-    # If the user is a new user
-    else:
-        return redirect('ProfileSetup')
+                ghg_percent = ((current_monthly_emissions - last_year_monthly_emissions) / last_year_monthly_emissions)
+                return [round(current_monthly_emissions, 2), ghg_percent]
+
+            user_context.update({'user_org': user_org_id,
+                                 'groups_in_operation': get_most_recent_and_change(
+                                     "total_groups_in_operation"),
+                                 'total_passenger_trips': get_most_recent_and_change(
+                                     "total_passenger_trips"),
+                                 'average_riders_per_van': get_most_recent_and_change(
+                                     "average_riders_per_van"),
+                                 'total_miles_traveled': get_most_recent_and_change(
+                                     "total_miles_traveled"),
+                                 'co2_emissions_avoided': ghg_calculator(),
+                                 'report_status': check_status(),
+                                 'report_month': report_month,
+                                 'previous_report_year': previous_report_year,
+                                 'last_report_year': recent_vanpool_report.report_year
+                                 })
+
+        if not organization.objects.get(id=user_org_id).summary_reporter:
+            user_context.update({'summary_reporter': False})
+        else:
+            org_progress, created = summary_organization_progress.objects.get_or_create(organization_id=user_org_id)
+
+            user_context.update({'summary_reporter': True,
+                                 'summary_report_status': summary_report_status.objects.get(year=get_current_summary_report_year(), organization_id=user_org_id),
+                                 'summary_organization_progress': org_progress
+                                 })
+
+    return render(request, 'pages/dashboard.html', user_context)
 
 
 # TODO rename forms to not be camel case
@@ -783,6 +796,38 @@ def Operation_Summary(request):
 # region summary
 @login_required(login_url='/Panacea/login')
 @group_required('Summary reporter', 'WSDOT staff')
+def pick_up_where_you_left_off(request):
+    summary_status = summary_report_status.objects.get(year=get_current_summary_report_year(), organization=find_user_organization(request.user.id))
+    org_progress, created = summary_organization_progress.objects.get_or_create(organization=find_user_organization(request.user.id))
+
+    if not org_progress.started:
+        return redirect('summary_instructions')
+    elif not org_progress.address_and_organization:
+        return redirect('cover_sheets_organization')
+    elif not org_progress.organization_details:
+        return redirect('cover_sheets_organization')
+    elif not org_progress.service_cover_sheet:
+        return redirect('cover_sheets_service')
+    elif not summary_status.cover_sheet_submitted_for_review:
+        return redirect('submit_cover_sheet')
+    elif not org_progress.confirm_service:
+        return redirect('summary_report_data')
+    elif not org_progress.transit_data:
+        return redirect('summary_reporting_type', 'transit_data')
+    elif not org_progress.revenue:
+        return redirect('summary_reporting_type', 'revenue')
+    elif not org_progress.expenses:
+        return redirect('summary_reporting_type', 'expense')
+    elif not org_progress.ending_balances:
+        return redirect('summary_reporting_type', 'fund_balance')
+    elif not summary_status.data_report_submitted_for_review:
+        return redirect('submit_data')
+    else:
+        raise Http404("Can't find where you left off.")
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
 def summary_instructions(request):
     user_org = find_user_organization(request.user.id)
     if get_cover_sheet_submitted(user_org.id):
@@ -1209,6 +1254,7 @@ class SummaryDataEntryConstructor:
             itertools.product(all_report_metric_ids, [self.year, self.year - 1, self.year - 2]))
         print(all_metric_ids_and_years)
         if len(current_report_metric_ids) != len(all_metric_ids_and_years):
+
             all_metric_ids_and_years = set(map(tuple, all_metric_ids_and_years))
             current_report_metric_ids = set(map(tuple, current_report_metric_ids))
             missing_metrics = list(all_metric_ids_and_years - current_report_metric_ids)
@@ -1363,10 +1409,19 @@ class SummaryDataEntryConstructor:
         for year_x in ['this_year', 'previous_year', 'two_years_ago']:
             formset = my_formset_factory(post_data, queryset=query_sets.filter(year=self.year - i).order_by(
                 self.get_metric_id_field_name()), prefix=year_x)
-            for form in formset:
-                if form.is_valid():
-                    form.save()
+            if formset.is_valid():
+                for form in formset:
+                    print('form_valid')
+                    if form.is_valid():
+                        form.save()
+            #         else:
+            #
+            #             print(form.errors)
+            # else:
+            #     print(formset.errors)
+
             i += 1
+
 
     def go_to_next_form(self):
         self.current_increment = self.current_increment + 1

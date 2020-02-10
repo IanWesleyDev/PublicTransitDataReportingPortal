@@ -374,7 +374,7 @@ class expense(models.Model):
 
     organization = models.ForeignKey(organization, on_delete=models.PROTECT, related_name='+')
     year = models.IntegerField()
-    expense_source = models.ForeignKey(expense_source, on_delete=models.PROTECT, related_name='+', blank=True, null=True)
+    expense_source = models.ForeignKey(expense_source, on_delete=models.PROTECT, related_name='+')
     reported_value = models.IntegerField(blank=True, null=True)
     report_by = models.ForeignKey(custom_user, on_delete=models.PROTECT, blank=True, null=True)
     comments = models.TextField(blank=True, null=True)
