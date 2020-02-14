@@ -10,7 +10,7 @@ from django.dispatch import receiver
 from localflavor.us.models import USStateField, USZipCodeField
 from phonenumber_field.modelfields import PhoneNumberField
 import datetime
-from jsonfield import JSONField
+
 
 from simple_history.models import HistoricalRecords
 
@@ -347,7 +347,7 @@ class revenue_source(models.Model):
     government_type = models.CharField(max_length=100, choices=LEVIATHANS, null=True, blank=True)
     funding_type = models.CharField(max_length=30, choices=FUNDING_KIND, null=True, blank=True)
     agency_classification = models.ManyToManyField(summary_organization_type, blank=True)
-    heading = models.CharField(max_length = 200, null=True, blank = True)
+    # heading = models.CharField(max_length = 200, null=True, blank = True)
 
     def __str__(self):
         return self.name

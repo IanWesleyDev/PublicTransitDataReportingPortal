@@ -1279,7 +1279,6 @@ class SummaryDataEntryConstructor:
         all_report_metric_ids = self.get_all_metric_ids()
         all_metric_ids_and_years = list(
             itertools.product(all_report_metric_ids, [self.year, self.year - 1, self.year - 2]))
-        print(all_metric_ids_and_years)
         if len(current_report_metric_ids) != len(all_metric_ids_and_years):
 
             all_metric_ids_and_years = set(map(tuple, all_metric_ids_and_years))
@@ -1299,15 +1298,15 @@ class SummaryDataEntryConstructor:
         '''Used to build widgets dynamically based on form type.'''
 
         if self.report_type == 'transit_data':
-            widget_attrs = {'class': 'form-control'}
+            widget_attrs = {'class': 'form-control validate-field'}
         else:
-            widget_attrs = {'class': 'form-control grand-total-sum', 'onchange': 'findTotal_wrapper();'}
+            widget_attrs = {'class': 'form-control grand-total-sum validate-field', 'onchange': 'findTotal_wrapper();'}
 
         widgets = {'id': forms.NumberInput(),
                    self.get_metric_model_name(): forms.Select(),
                    'year': forms.NumberInput(),
                    'reported_value': forms.TextInput(attrs=widget_attrs),
-                   'comments': forms.Textarea(attrs={'class': 'form-control', "rows": 3})
+                   'comments': forms.Textarea(attrs={'class': 'form-control comment-field', "rows": 3})
                    }
         return widgets
 
@@ -1329,7 +1328,6 @@ class SummaryDataEntryConstructor:
     def get_formset_query_dict(self):
         '''Builds a dynamic dictionary used for querying the aproriate metrics giving the filter criteria and organization classification'''
         if self.report_type in ['transit_data', ]:
-
             query_dict = {'transit_mode__name': self.form_filter_1,
                           'administration_of_mode': self.form_filter_2,
                           'transit_metric__agency_classification': self.target_organization.summary_organization_classifications
@@ -1347,7 +1345,6 @@ class SummaryDataEntryConstructor:
         form_querysets = self.get_or_create_all_form_metrics()
         form_querysets = form_querysets.filter(**self.get_formset_query_dict())
         return form_querysets
-
 
     def get_formsets_labels_and_masking_class(self):
         '''Builds formsets by year with labels and masking classes'''
@@ -1435,21 +1432,17 @@ class SummaryDataEntryConstructor:
         query_sets = self.get_form_queryset()
         i = 0
         for year_x in ['this_year', 'previous_year', 'two_years_ago']:
+            query = query_sets.filter(year=self.year - i).order_by(
+                self.get_metric_id_field_name())
             formset = my_formset_factory(post_data, queryset=query_sets.filter(year=self.year - i).order_by(
                 self.get_metric_id_field_name()), prefix=year_x)
-            if formset.is_valid():
-                for form in formset:
-                    print('form_valid')
-                    if form.is_valid():
-                        form.save()
-            #         else:
-            #
-            #             print(form.errors)
-            # else:
-            #     print(formset.errors)
+            for form in formset:
+                if form.is_valid():
+                    form.save()
+                else:
+                    print(form.errors)
 
             i += 1
-
 
     def go_to_next_form(self):
         self.current_increment = self.current_increment + 1
@@ -1479,7 +1472,6 @@ class SummaryDataEntryConstructor:
                     raise Http404("Report type does not exist. -7b")
 
                 new_report_type = self.REPORT_TYPES[self.REPORT_TYPES.index(self.report_type)+1]
-                print(new_report_type)
                 return redirect('summary_reporting_type', new_report_type)
         else:
             self.form_filter_1 = self.nav_filters[self.current_increment - 1][0]
@@ -1939,7 +1931,6 @@ def add_cover_sheet_note_customer(request, year, note_area, note_field):
         url = reverse('cover_sheets_service')
     else:
         raise PermissionError
-
 
     if request.POST:
         form = add_cover_sheet_review_note(request.POST)
