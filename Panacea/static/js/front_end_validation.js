@@ -10,7 +10,7 @@ function greater_than_error_msg(lesser_label, greater_label){
     return (greater_label + " must be greater than " + lesser_label + ".")
 }
 
-//List of error messages that may be removed by comments
+//List of error messages that may be removed by comments - When adding new validation rule that are removed by comments be sure to add them to validate_if_null function
 let err_msg_removable_by_comment = [err_msg_previous_report_needs_comment, err_msg_fifteen_percent_change]
 
 //dictionary that contains the labels for the fields that must be greater than the other field
@@ -172,20 +172,18 @@ function error_list_remove_li(errorlist_elem, err_msg){
 }
 
 function remove_err_msg(input_elem, err_msg) {
+    // remove_err_msg without an err_msg parameter will remove all error messages that require a comment
     //select error list
     let errorlist_elem = getNextElement(input_elem.parentElement, 'validation_errors').childNodes[0];
     errorlist_elem = errorlist_elem.querySelectorAll('li');
     //if no specific err_msg remove all error msg
     if (element_has_error(input_elem) && err_msg == null){
         let msg_to_remove = error_dict[input_elem.name];
-
         for(let i=0; i < msg_to_remove.length; i++){
             if(err_msg_removable_by_comment.includes(msg_to_remove[i])){
-                error_list_remove_li(errorlist_elem, msg_to_remove[i])
                 remove_err_msg(input_elem, msg_to_remove[i])
             }
         }
-
     } else if (element_has_error(input_elem, err_msg)){
         let index = error_dict[input_elem.name].indexOf(err_msg);
         error_dict[input_elem.name].splice(index, 1);
@@ -198,12 +196,8 @@ function remove_err_msg(input_elem, err_msg) {
 }
 
 function set_button_status(){
-    if (Object.keys(error_dict).length > 0){
-        document.getElementById("submit_btn").disabled = true;
-    } else {
-        document.getElementById("submit_btn").disabled = false;
-    }
-
+    // disables the submit button if there are any errors in the error dictionary
+    document.getElementById("submit_btn").disabled = Object.keys(error_dict).length > 0;
 }
 
 function validate_if_null() {
@@ -211,10 +205,8 @@ function validate_if_null() {
         let elem = getPreviousElement(this.parentElement, 'summary-input');
         if (elem.classList.contains('this-year')){
             fifteen_percent_needs_comment.call(elem.childNodes[0])
-            // set_button_status()
         } else {
             updates_to_past_data_need_comments.call(elem.childNodes[0])
-            // set_button_status()
         }
     }
 }
