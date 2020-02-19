@@ -180,7 +180,7 @@ function fifteen_percent_needs_comment() {
 //Helper functions
 // // elem should always refer to the form input element, elem.ParentElement is the table cell
 
-//Helper functions to get next & previous sibling with given class
+// // Helper functions to get next & previous sibling with given class
 function getNextElement(any_elem, className) {
     let next = any_elem.nextElementSibling;
     while (next && !next.classList.contains(className)) next = next.nextElementSibling;
@@ -192,7 +192,7 @@ function getPreviousElement(any_elem, className) {
     return next;
 }
 
-// Other helper functions
+// // Other helper functions
 function changed_from_previous_report(elem){
     return !(parseFloat(old_values[elem.name]).toFixed(2) == parseFloat(elem.value.replace(/\$|,/g, "")).toFixed(2));
 }
@@ -245,10 +245,10 @@ function remove_err_msg(elem, err_msg) {
     errorlist_elem = errorlist_elem.querySelectorAll('li');
     //if no specific err_msg remove all error msg
     if (element_has_error(elem) && err_msg == null){
-        let msg_to_remove = error_dict[input_elem.name];
+        let msg_to_remove = error_dict[elem.name];
         for(let i=0; i < msg_to_remove.length; i++){
             if(err_msg_removable_by_comment.includes(msg_to_remove[i])){
-                remove_err_msg(input_elem, msg_to_remove[i])
+                remove_err_msg(elem, msg_to_remove[i])
             }
         }
     } else if (element_has_error(elem, err_msg)){

@@ -983,6 +983,9 @@ def submit_cover_sheet_submit(request):
     user_org = find_user_organization(request.user.id)
     ready_to_submit = get_all_cover_sheet_steps_completed(user_org.id)
     if not ready_to_submit:
+
+
+
         raise Http404("Your coversheet is not ready to be submitted. Please go through each tab and confirm your data has been updated.")
 
     report_status = summary_report_status.objects.get(year=get_current_summary_report_year(), organization=user_org)
