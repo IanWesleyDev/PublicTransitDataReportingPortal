@@ -4,12 +4,8 @@ import datetime
 import itertools
 import json
 
-from django.template import RequestContext
-from django_pandas.io import read_frame
+
 import pandas as pd
-
-from .validators import validation_test_for_transit_data
-
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
@@ -31,12 +27,8 @@ from dateutil.relativedelta import relativedelta
 import datetime
 from django.urls import reverse
 from Panacea.decorators import group_required
-from .utilities import monthdelta, get_wsdot_color, get_vanpool_summary_charts_and_table, percent_change_calculation, \
-    find_vanpool_organizations, get_current_summary_report_year, filter_revenue_sheet_by_classification, \
-    find_user_organization_id, complete_data, green_house_gas_per_sov_mile, green_house_gas_per_vanpool_mile, \
-    build_revenue_table, build_expense_table, build_total_funds_by_source, \
-    generate_performance_measure_table, generate_mode_by_agency_tables, create_statewide_revenue_table, \
-    create_statewide_expense_table, create_all_summary_report_statuses, build_operations_data_table
+from .utilities import generate_performance_measure_table, generate_mode_by_agency_tables, create_statewide_revenue_table, \
+    create_statewide_expense_table, create_all_summary_report_statuses
 from django.http import Http404
 from .filters import VanpoolExpansionFilter, VanpoolReportFilter
 from django.conf import settings
@@ -74,8 +66,10 @@ from .utilities import calculate_latest_vanpool, find_maximum_vanpool, calculate
     reset_all_orgs_summary_progress
 from .utilities import monthdelta, get_wsdot_color, get_vanpool_summary_charts_and_table, percent_change_calculation, \
     find_vanpool_organizations, get_current_summary_report_year, filter_revenue_sheet_by_classification, \
-    complete_data, green_house_gas_per_sov_mile, green_house_gas_per_vanpool_mile, build_revenue_table
+    complete_data, green_house_gas_per_sov_mile, green_house_gas_per_vanpool_mile
+from .tables import build_operations_data_table, build_investment_table, build_revenue_table, build_total_funds_by_source, build_community_provider_revenue_table
 from .validators import validation_test_for_transit_data
+from .statewide_tables import create_statewide_revenue_table, create_statewide_expense_table, generate_mode_by_agency_tables, generate_performance_measure_table
 
 
 # region shared_views
@@ -114,7 +108,7 @@ def dashboard(request):
         user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
         user_context = {'user_org': user_org_id}
 
-        if organization.objects.get(id=user_org_id).vanpool_program == False:
+        if organization.objects.get(id=user_org_id).vanpool_program == False or not request.user.groups.filter(name__in=['Vanpool reporter']).exists():
             vp_program = False
             user_context.update({'vp_program': vp_program})
         else:
@@ -184,7 +178,7 @@ def dashboard(request):
                                  'last_report_year': recent_vanpool_report.report_year
                                  })
 
-        if not organization.objects.get(id=user_org_id).summary_reporter:
+        if not organization.objects.get(id=user_org_id).summary_reporter or not request.user.groups.filter(name__in=['Summary reporter']).exists():
             user_context.update({'summary_reporter': False})
         else:
             org_progress, created = summary_organization_progress.objects.get_or_create(organization_id=user_org_id)
@@ -1646,7 +1640,10 @@ def view_annual_operating_information(request):
     current_user_id = request.user.id
     user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
     org_classification = organization.objects.get(id = user_org_id).summary_organization_classifications
-    df = build_operations_data_table(years, [user_org_id], org_classification)
+    if str(org_classification) == 'Community provider':
+        df = build_community_provider_revenue_table(years, [user_org_id])
+    else:
+        df = build_operations_data_table(years, [user_org_id], org_classification)
     heading_list = ['Annual Operating Information'] + years +['One Year Change (%)']
     data = df.to_dict(orient = 'records')
     return render(request, 'pages/summary/view_agency_report.html', {'data':data, 'years': heading_list})
@@ -1720,7 +1717,6 @@ def view_statewide_operating(request):
     user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
     org_classification = organization.objects.get(id = user_org_id).summary_organization_classifications
     org_list = list(organization.objects.filter(summary_organization_classifications = org_classification).value_list('id', flat = True))
-
     return render(request)
 
 def view_statewide_revenue(request):

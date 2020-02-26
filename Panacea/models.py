@@ -535,6 +535,7 @@ class service_offered(models.Model):
     )
     transit_mode = models.ForeignKey(transit_mode, on_delete=models.PROTECT, related_name ='+', blank=True)
     administration_of_mode = models.CharField(max_length=80, choices=DO_OR_PT, blank=False)
+    service_mode_discontinued = models.BooleanField(default=False, blank=False, null=False)
     organization = models.ForeignKey(organization, on_delete=models.PROTECT, blank=True, null=False)
 
 
@@ -574,6 +575,9 @@ class stylesheets(models.Model):
     ferry_revenue = models.CharField(max_length=200, blank=True, null= True)
     transit_data = models.CharField(max_length=200, blank=True, null=True)
     ferry_data = models.CharField(max_length=200, blank=True, null=True)
+    cp_data = models.CharField(max_length=200, blank=True, null=True)
+    cp_revenue_source = models.CharField(max_length=200, blank=True, null=True)
+    cp_revenue_federal = models.CharField(max_length=200, blank=True, null=True)
 
 
 class statewide_measures(models.Model):
