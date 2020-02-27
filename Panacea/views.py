@@ -1640,10 +1640,7 @@ def view_annual_operating_information(request):
     current_user_id = request.user.id
     user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
     org_classification = organization.objects.get(id = user_org_id).summary_organization_classifications
-    if str(org_classification) == 'Community provider':
-        df = build_community_provider_revenue_table(years, [user_org_id])
-    else:
-        df = build_operations_data_table(years, [user_org_id], org_classification)
+    df = build_operations_data_table(years, [user_org_id], org_classification)
     heading_list = ['Annual Operating Information'] + years +['One Year Change (%)']
     data = df.to_dict(orient = 'records')
     return render(request, 'pages/summary/view_agency_report.html', {'data':data, 'years': heading_list})
@@ -1655,7 +1652,10 @@ def view_financial_information(request):
     current_user_id = request.user.id
     user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
     org_classification = organization.objects.get(id=user_org_id).summary_organization_classifications
-    revenuedf = build_revenue_table(years, [user_org_id], org_classification)
+    if str(org_classification) == 'Community provider':
+        revenuedf = build_community_provider_revenue_table(years, [user_org_id])
+    else:
+        revenuedf = build_revenue_table(years, [user_org_id], org_classification)
     financial_data = revenuedf.to_dict(orient = 'records')
     financial_heading_years = ['Financial Information'] + years + ['One Year Change(%)']
     return render(request, 'pages/summary/view_financial_report.html', {'financial_data':financial_data, 'finance_years': financial_heading_years})

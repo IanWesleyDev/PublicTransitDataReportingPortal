@@ -206,10 +206,13 @@ def build_community_provider_revenue_table(years, user_org_id):
     funding_order = [('Operating', ['State', 'Local', 'Other']), ('Capital', ['State', 'Local', 'Other']), ('Operating', ['Federal']), ('Capital', ['Federal'])]
     count = 0
     for funding in funding_order:
-        revenue_data = revenue.objects.filter(organization_id__in=user_org_id, year__in = years, revenue_source__government_type__in=funding[1], revenue_source__funding_type=funding[0])
+        revenue_data = revenue.objects.filter(organization_id__in=user_org_id, year__in = years, revenue_source__government_type__in=funding[1], revenue_source__funding_type=funding[0]).values('revenue_source__name', 'reported_value', 'year', 'revenue_source_id')
         df = read_frame(revenue_data)
-        df = df[df.reported_value.notna()][['revenue_source', 'reported_value', 'year']]
-        df = df.pivot(index='revenue_source', columns='year', values='reported_value').fillna(0)
+        df = df.pivot(index='revenue_source__name', columns='year', values='reported_value').fillna(0)
+        subtotal_list = ['Sub-Total'] +list(df.sum(axis=0))
+        df = df.reset_index()
+        df = add_a_list_to_a_dataframe(df, subtotal_list)
+        print(df)
 
 
 def build_revenue_table(years, user_org_id, classification):
