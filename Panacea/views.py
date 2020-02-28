@@ -1447,7 +1447,7 @@ def wsdot_review_cover_sheets(request, year=None, organization_id=None):
                    'base64_logo': base64_logo})
 
 
-# TODO Come back through and change this to be object oriented code about a notes object.
+# TODO Come back through and change this to be object oriented code about a notes object that works for cover sheets and data. Sorry future me... I was running out of time/
 @login_required(login_url='/Panacea/login')
 def base_note(request):
     # this is used to build the base url to submit a new note it is never actually called.
@@ -1522,7 +1522,6 @@ def add_cover_sheet_note_customer(request, year, note_area, note_field):
         url = reverse('cover_sheets_service')
     else:
         raise PermissionError
-
 
     if request.POST:
         form = add_cover_sheet_review_note(request.POST)
