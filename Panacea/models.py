@@ -14,24 +14,14 @@ import datetime
 from simple_history.models import HistoricalRecords
 
 
-from Panacea.submodels.shared.shared import *
-from Panacea.submodels.vanpool.vanpool import *
-from Panacea.submodels.summary.misc import *
-from Panacea.submodels.summary.cover_sheets import *
-from Panacea.submodels.summary.data_reports import *
-from Panacea.submodels.summary.review_and_tracking import *
-from Panacea.submodels.summary.tables_and_reports import *
-
-
-
-
-
-
-
-# endregion
-
-
-
+# Load order of models matters
+from Panacea.shared_content.models import *
+from Panacea.vanpool.models import *
+from Panacea.summary.misc.models import *
+from Panacea.summary.coversheet.models import *
+from Panacea.summary.data_report.models import *
+from Panacea.summary.review_tracking.models import *
+from Panacea.summary.tables_and_reports.models import *
 
 
 #TODO did I forget to include this table in the data entry?

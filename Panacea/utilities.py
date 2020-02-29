@@ -5,7 +5,9 @@ from django.db import transaction
 from django_pandas.io import read_frame
 import pandas as pd
 import numpy as np
-from .models import revenue_source, organization, vanpool_expansion_analysis, vanpool_report, profile, transit_data, \
+from Panacea.vanpool.models import *
+
+from .models import revenue_source, profile, transit_data, \
     service_offered, transit_mode, revenue, expense, depreciation, fund_balance, stylesheets,  summary_organization_progress, summary_report_status
 from django.db.models import Max, Subquery, F, OuterRef, Case, CharField, Value, When, Sum, Count, Avg, FloatField, \
     ExpressionWrapper, Q
