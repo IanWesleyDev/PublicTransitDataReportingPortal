@@ -41,10 +41,26 @@ from .emails import send_user_registration_email, notify_user_that_permissions_h
 import base64
 from django import forms
 
-from .vanpool.forms import *
-
-from .forms import *
-from .models import profile, custom_user, organization, cover_sheet, \
+from .forms import CustomUserCreationForm, \
+    custom_user_ChangeForm, \
+    PhoneOrgSetup, \
+    ReportSelection, \
+    VanpoolMonthlyReport, \
+    user_profile_custom_user, \
+    user_profile_profile, \
+    organization_profile, \
+    change_user_permissions_group, \
+    vanpool_metric_chart_form, \
+    submit_a_new_vanpool_expansion, \
+    Modify_A_Vanpool_Expansion, \
+    request_user_permissions, \
+    statewide_summary_settings, \
+    Modify_A_Vanpool_Expansion, organisation_summary_settings, organization_information, cover_sheet_service, \
+    cover_sheet_organization, \
+    transit_data_form, \
+    service_offered_form, validation_error_form, email_contact_form, change_user_org, \
+    cover_sheet_wsdot_review, add_cover_sheet_review_note
+from .models import profile, vanpool_report, custom_user, vanpool_expansion_analysis, organization, cover_sheet, \
     revenue, transit_data, expense, expense_source, service_offered, revenue_source, \
     transit_metrics, transit_mode, fund_balance, fund_balance_type, summary_organization_type, validation_errors,  summary_report_status, cover_sheet_review_notes, summary_organization_progress
 from django.contrib.auth.models import Group
@@ -420,6 +436,385 @@ def logout_view(request):
 
 # region vanpool
 
+@login_required(login_url='/Panacea/login')
+@group_required('Vanpool reporter')
+def Vanpool_report(request, year=None, month=None):
+    # Set form parameters
+    user_organization_id = profile.objects.get(custom_user_id=request.user.id).organization_id
+    user_organization = organization.objects.get(id=user_organization_id)
+    organization_data = vanpool_report.objects.filter(organization_id=user_organization_id)
+
+    # logic to select the most recent form or the form requested through the URL
+    if not year:
+        organization_data_incomplete = organization_data.filter(report_date=None)
+        start_year = organization_data_incomplete \
+            .aggregate(Min('report_year')) \
+            .get('report_year__min')
+        start_month = organization_data_incomplete.filter(report_year=start_year) \
+            .aggregate(Min('report_month')) \
+            .get('report_month__min')
+        year = start_year
+        month = start_month
+    elif not month:
+        month = 1
+
+    # Logic to hide year selectors
+    min_year = organization_data.all().aggregate(Min('report_year')).get('report_year__min') == year
+    max_year = organization_data.all().aggregate(Max('report_year')).get('report_year__max') == year
+
+    # TODO rename to something better (this populates the navigation table)
+    past_report_data = vanpool_report.objects.filter(organization_id=user_organization_id, report_year=year)
+
+    # Instance data to link form to data
+    form_data = vanpool_report.objects.get(organization_id=user_organization_id, report_year=year, report_month=month)
+
+    # TODO convert to django message framework
+    # Logic if form is a new report or is an existing report (Comments are needed before editing an existing reports)
+    if form_data.report_date is None:
+        new_report = True
+    else:
+        new_report = False
+
+    # Respond to POST request
+    if request.method == 'POST':
+        form = VanpoolMonthlyReport(user_organization=user_organization, data=request.POST, instance=form_data,
+                                    record_id=form_data.id, report_month=month, report_year=year)
+        if form.is_valid():
+            form.save()
+            successful_submit = True  # Triggers a modal that says the form was submitted
+            new_report = False
+
+        # TODO Fix this show it shows the form
+        else:
+            form = VanpoolMonthlyReport(user_organization=user_organization, data=request.POST, instance=form_data,
+                                        record_id=form_data.id, report_month=month, report_year=year)
+            successful_submit = False
+
+    # If not POST
+    else:
+        form = VanpoolMonthlyReport(user_organization=user_organization, instance=form_data, record_id=form_data.id,
+                                    report_month=month, report_year=year)
+        successful_submit = False
+
+    if new_report == False:
+        form.fields['changeReason'].required = True
+    else:
+        form.fields['changeReason'].required = False
+
+    return render(request, 'pages/vanpool/Vanpool_report.html', {'form': form,
+                                                                 'past_report_data': past_report_data,
+                                                                 'year': year,
+                                                                 'month': month,
+                                                                 'organization': user_organization,
+                                                                 'successful_submit': successful_submit,
+                                                                 'min_year': min_year,
+                                                                 'max_year': max_year,
+                                                                 'new_report': new_report}
+                  )
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('WSDOT staff')
+def Vanpool_expansion_submission(request):
+    if request.method == 'POST':
+        form = submit_a_new_vanpool_expansion(data=request.POST)
+        if form.is_valid():
+            instance = form.save(commit=False)
+            instance.deadline = instance.latest_vehicle_acceptance + relativedelta(months=+18)
+            instance.expansion_goal = int(round(instance.expansion_vans_awarded * .8, 0) + \
+                                          instance.vanpools_in_service_at_time_of_award)
+            instance.expired = False
+            instance.vanpool_goal_met = False
+            instance.extension_granted = False
+            instance.save()
+            # the redirect here is to the expansion page, which triggers the sqlite queries to populate the rest of the data
+            return JsonResponse({'redirect': '../Expansion/'})
+        else:
+            return render(request, 'pages/Vanpool_expansion_submission.html', {'form': form})
+    else:
+        form = submit_a_new_vanpool_expansion(data=request.POST)
+    return render(request, 'pages/vanpool/Vanpool_expansion_submission.html', {'form': form})
+
+
+@login_required(login_url='/Panacea/login')
+def Vanpool_expansion_analysis(request):
+    # pulls the latest vanpool data
+    calculate_latest_vanpool()
+    find_maximum_vanpool()
+    calculate_remaining_months()
+    calculate_if_goal_has_been_reached()
+    f = VanpoolExpansionFilter(request.GET, queryset=vanpool_expansion_analysis.objects.all())
+    return render(request, 'pages/vanpool/Vanpool_expansion.html', {'filter': f})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('WSDOT staff')
+def Vanpool_expansion_modify(request, id=None):
+    if not id:
+        id = 1
+    orgs = vanpool_expansion_analysis.objects.filter(expired=False).values('organization_id')
+    organization_name = organization.objects.filter(id__in=orgs).values('name')
+    vea = vanpool_expansion_analysis.objects.all().filter(expired=False).order_by('organization_id')
+    form_data = vanpool_expansion_analysis.objects.get(id=id)
+
+    if request.method == 'POST':
+        form = Modify_A_Vanpool_Expansion(data=request.POST, instance=form_data)
+        if form.is_valid():
+            form.cleaned_data['deadline'] = form.cleaned_data['latest_vehicle_acceptance'] + relativedelta(months=+18)
+            form.save()
+        else:
+            form = Modify_A_Vanpool_Expansion(instance=form_data)
+
+    else:
+        form = Modify_A_Vanpool_Expansion(instance=form_data)
+    zipped = zip(organization_name, vea)
+    return render(request, 'pages/vanpool/Vanpool_expansion_modify.html', {'zipped':zipped, 'id': id, 'form':form})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Vanpool reporter', 'WSDOT staff')
+def Vanpool_data(request):
+
+    # If it is a request for a chart
+    if request.POST:
+        form = vanpool_metric_chart_form(data=request.POST)
+        org_list = request.POST.getlist("chart_organizations")
+        chart_time_frame = monthdelta(datetime.datetime.now().date(), form.data['chart_time_frame'])
+        chart_measure = form.data['chart_measure']
+
+    # Default chart for first load
+    else:
+        default_time_frame = 36  # months
+        chart_time_frame = monthdelta(datetime.datetime.now().date(), default_time_frame)
+        org_list = [profile.objects.get(custom_user_id=request.user.id).organization_id]
+        chart_measure = 'total_miles_traveled'
+        form = vanpool_metric_chart_form(initial={'chart_organizations': org_list[0],
+                                                  'chart_measure': chart_measure,
+                                                  'chart_time_frame': default_time_frame})
+
+    if form.is_valid:
+        # Get data for x axis labels
+        all_chart_data = [report for report in
+                          vanpool_report.objects.filter(organization_id__in=org_list).order_by('organization',
+                                                                                               'report_year',
+                                                                                               'report_month').all() if
+                          chart_time_frame <= report.report_due_date <= datetime.datetime.today().date()]
+        x_axis_labels = [report.report_year_month_label for report in all_chart_data]
+        x_axis_labels = list(dict.fromkeys(x_axis_labels))
+
+        # Get datasets in the format chart.js needs
+        chart_datasets = {}
+        color_i = 0
+        for org in org_list:
+            chart_dataset = [report for report in
+                             vanpool_report.objects.filter(organization_id=org).order_by('organization', 'report_year',
+                                                                                         'report_month').all() if
+                             chart_time_frame <= report.report_due_date <= datetime.datetime.today().date()]
+            chart_dataset = [getattr(report, chart_measure) for report in chart_dataset]
+            chart_datasets[organization.objects.get(id=org).name] = [json.dumps(list(chart_dataset)),
+                                                                     get_wsdot_color(color_i)]
+            color_i = color_i + 1
+
+        # Set chart title
+        chart_title = form.MEASURE_CHOICES_DICT[chart_measure]
+
+        return render(request, 'pages/vanpool/Vanpool_data.html', {'form': form,
+                                                                   'chart_title': chart_title,
+                                                                   'chart_measure': chart_measure,
+                                                                   'chart_label': x_axis_labels,
+                                                                   'chart_datasets_filtered': chart_datasets,
+                                                                   'org_list': org_list
+                                                                   })
+    else:
+        raise Http404
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Vanpool reporter', 'WSDOT staff')
+def download_vanpool_data(request, org_id = None):
+    org_id = profile.objects.get(custom_user_id=request.user.id).organization_id
+    org_name = organization.objects.get(id=org_id).name
+    vanshare_existence = organization.objects.get(id = org_id).vanshare_program
+    vanpool_data = vanpool_report.objects.filter(organization_id = org_id, vanpool_groups_in_operation__isnull=False)
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="{}.csv"'.format(org_name)
+    writer = csv.writer(response)
+    count = 0
+
+    for k in vanpool_data:
+        if count == 0:
+            writer.writerow(list(k.__dict__.keys())[1:])
+            count +=1
+        else:
+            writer.writerow(list(k.__dict__.values())[1:])
+    return response
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Vanpool reporter', 'WSDOT staff')
+def vanpool_organization_summary(request, org_id=None):
+
+    if request.POST:
+        settings_form = organisation_summary_settings(data=request.POST)
+        include_years = int(settings_form.data['include_years'])
+        org_id = settings_form.data['summary_org']
+
+    else:
+        include_years = 3
+        org_id = profile.objects.get(custom_user_id=request.user.id).organization_id
+        settings_form = organisation_summary_settings(initial={
+            "include_years": include_years,
+            "summary_org": org_id
+        })
+
+    if settings_form.is_valid:
+        org_name = organization.objects.get(id=org_id).name
+        x_axis_labels, all_charts, summary_table_data, summary_table_data_total = get_vanpool_summary_charts_and_table(
+            include_years=include_years,
+            is_org_summary=True,
+            org_id=org_id,
+            include_regions=None,
+            include_agency_classifications=None)
+
+    return render(request, 'pages/vanpool/vanpool_organization_summary.html', {'settings_form': settings_form,
+                                                                               'chart_label': x_axis_labels,
+                                                                               'all_charts': all_charts,
+                                                                               'summary_table_data': summary_table_data,
+                                                                               'summary_table_data_total': summary_table_data_total,
+                                                                               'organization_name': org_name
+                                                                               }
+                  )
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Vanpool reporter', 'WSDOT staff')
+def vanpool_statewide_summary(request):
+
+    latest_complete_data = complete_data()
+
+    if request.POST:
+        settings_form = statewide_summary_settings(data=request.POST)
+        include_agency_classifications = request.POST.getlist("include_agency_classifications")
+        include_years = int(settings_form.data['include_years'])
+        include_regions = settings_form.data['include_regions']
+
+    else:
+        include_years = 3
+        include_regions = "Statewide"
+        include_agency_classifications = [classification[0] for classification in organization.AGENCY_CLASSIFICATIONS]
+
+        settings_form = statewide_summary_settings(initial={
+            "include_years": include_years,
+            "include_regions": include_regions,
+            "include_agency_classifications": include_agency_classifications
+        })
+
+    if settings_form.is_valid:
+        x_axis_labels, all_charts, summary_table_data, summary_table_data_total = get_vanpool_summary_charts_and_table(
+            include_years=include_years,
+            is_org_summary=False,
+            org_id=None,
+            include_regions=include_regions,
+            include_agency_classifications=include_agency_classifications)
+
+
+    return render(request, 'pages/vanpool/vanpool_statewide_summary.html', {'settings_form': settings_form,
+                                                                            'chart_label': x_axis_labels,
+                                                                            'all_charts': all_charts,
+                                                                            'summary_table_data': summary_table_data,
+                                                                            'summary_table_data_total': summary_table_data_total,
+                                                                            'include_regions': include_regions,
+                                                                            'include_agency_classifications': include_agency_classifications,
+                                                                            'latest_complete_data': latest_complete_data
+                                                                            }
+                  )
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('WSDOT staff')
+def Vanpool_Growth(request):
+
+    # class growth_report_table():
+    #
+    #     def __init__(self, start_vanpool_report_year, end_vanpool_report_year):
+    #         self.start_year= start_vanpool_report_year.report_year
+    #         self.end_year = end_vanpool_report_year.report_year
+    #         self.start_year_vans = start_vanpool_report_year.report_year
+    #         self.most_recent_year_vans = end_vanpool_report_year.vanpool_groups_in_operation + end_vanpool_report_year.vanshare_groups_in_operation
+    #         self.percent_growth =
+    #         self.absolute_van_growth
+    #         self.most_recent_year_folds
+    #         self.most_recent_year_start
+
+    listOfAgencies = find_vanpool_organizations()
+    for i in listOfAgencies:
+        organizationId = i.id
+        start_vanpool_report_year = vanpool_report.objects.filter(organization_id=organizationId,
+                                                                  report_date__isnull=False, report_month=12, ).first()
+        end_vanpool_report_year = vanpool_report.objects.filter(organization_id=organizationId,
+                                                                report_date__isnull=False, report_month=12, ).last()
+    return render(request, 'pages/vanpool/VanpoolGrowth.html', {})
+
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('WSDOT staff')
+def Operation_Summary(request):
+    total_vp = vanpool_report.objects.values('report_year').annotate(Sum('vanpool_groups_in_operation')).filter(
+        report_month=12, vanpool_groups_in_operation__isnull=False)
+    years = [i['report_year'] for i in total_vp]
+    print(years)
+    total_vp = vanpool_report.objects.values('report_year').annotate(Sum('vanpool_groups_in_operation')).filter(
+        report_month=12, vanpool_groups_in_operation__isnull=False)
+    vp_percent_change = percent_change_calculation(total_vp, 'vanpool_groups_in_operation__sum')
+    total_vs = vanpool_report.objects.values('report_year').annotate(Sum('vanshare_groups_in_operation')).filter(
+        report_month=12, vanshare_groups_in_operation__isnull=False)
+    vs_percent_change = percent_change_calculation(total_vs, 'vanshare_groups_in_operation__sum')
+    total_starts = vanpool_report.objects.values('report_year').annotate(Sum('vanpool_group_starts')).filter(
+        vanpool_groups_in_operation__isnull=False)
+    starts_percent_change = percent_change_calculation(total_starts, 'vanpool_group_starts__sum')
+    total_folds = vanpool_report.objects.values('report_year').annotate(Sum('vanpool_group_folds')).filter(
+        vanpool_groups_in_operation__isnull=False)
+    folds_percent_change = percent_change_calculation(total_folds, 'vanpool_group_folds__sum')
+    zipped = zip(total_starts, total_vp)
+    starts_as_a_percent = []
+    for i in zipped:
+        percent = round((i[0]['vanpool_group_starts__sum'] / i[1]['vanpool_groups_in_operation__sum']) * 100, 2)
+        starts_as_a_percent.append(percent)
+    folds_as_a_percent = []
+    zipped = zip(total_folds, total_vp)
+    for i in zipped:
+        percent = round((i[0]['vanpool_group_folds__sum'] / i[1]['vanpool_groups_in_operation__sum']) * 100, 2)
+        folds_as_a_percent.append(percent)
+    zipped = zip(total_starts, total_folds)
+    net_vanpool = []
+    for start, fold in zipped:
+        net_vanpool.append(start['vanpool_group_starts__sum'] - fold['vanpool_group_folds__sum'])
+    avg_riders = vanpool_report.objects.values('report_year').annotate(Avg('average_riders_per_van')).filter(
+        vanpool_groups_in_operation__isnull=False)
+    avg_miles = vanpool_report.objects.values('report_year').annotate(Avg('average_round_trip_miles')).filter(
+        vanpool_groups_in_operation__isnull=False)
+    print(avg_riders)
+    print(avg_miles)
+    vp_totals = zip(total_vp, vp_percent_change)
+    vs_totals = zip(total_vs, vs_percent_change)
+    starts = zip(total_starts, starts_percent_change)
+    folds = zip(total_folds, folds_percent_change)
+    empty_list = [''] * len(total_vp)
+    starts_as_percent = zip(starts_as_a_percent, empty_list)
+    folds_as_percent = zip(folds_as_a_percent, empty_list)
+    net_vans = zip(net_vanpool, empty_list)
+    average_riders = zip(avg_riders, empty_list)
+    average_miles = zip(avg_miles, empty_list)
+
+    return render(request, 'pages/vanpool/OperationSummary.html',
+                  {'vp_totals': vp_totals, 'vs_totals': vs_totals, 'starts': starts, 'folds': folds,
+                   'starts_as_a_percent': starts_as_percent,
+                   'folds_as_percent': folds_as_percent, 'net_vans': net_vans, 'average_riders': average_riders,
+                   'average_miles': average_miles, 'years': years})
+
+
 # endregion
 
 
@@ -456,6 +851,151 @@ def pick_up_where_you_left_off(request):
         raise Http404("Can't find where you left off.")
 
 
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def summary_instructions(request):
+    user_org = find_user_organization(request.user.id)
+    if get_cover_sheet_submitted(user_org.id):
+        return redirect('cover_sheet_submitted')
+
+    summary_progress, created = summary_organization_progress.objects.get_or_create(organization=user_org)
+    summary_progress.started = True
+    summary_progress.save()
+    ready_to_submit = get_all_cover_sheet_steps_completed(user_org.id)
+
+    return render(request, 'pages/summary/summary_instructions.html', {'ready_to_submit': ready_to_submit})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def organizational_information(request):
+    user_profile_data = profile.objects.get(custom_user=request.user.id)
+    org = user_profile_data.organization
+    org_name = org.name
+    form = organization_profile(instance=org)
+    if request.POST:
+        if form.is_valid():
+            # most times this form get submitted to the OrganizationProfile view so this is never called
+            form.save()
+
+            return redirect('organizational_information')
+
+    ready_to_submit = get_all_cover_sheet_steps_completed(org.id)
+
+    return render(request, 'pages/summary/organizational_information.html', {'org_name': org_name,
+                                                                             'form': form,
+                                                                             'ready_to_submit': ready_to_submit})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def cover_sheet_organization_view(request):
+    user_profile_data = profile.objects.get(custom_user=request.user.id)
+    org = user_profile_data.organization
+    org_name = org.name
+    cover_sheet_instance, created = cover_sheet.objects.get_or_create(organization_id=org.id)
+    form = cover_sheet_organization(instance=cover_sheet_instance)
+    notes = cover_sheet_review_notes.objects.filter(year=get_current_summary_report_year(), summary_report_status__organization=org, note_area="Organization")
+    new_note_form = add_cover_sheet_review_note()
+    try:
+        base64_logo = base64.encodebytes(cover_sheet_instance.organization_logo).decode("utf-8")
+    except:
+        base64_logo = ""
+
+    if request.POST:
+        form = cover_sheet_organization(instance=cover_sheet_instance, data=request.POST, files=request.FILES)
+
+        if form.is_valid():
+            instance = form.save(commit=False)
+            filepath = request.FILES.get('organization_logo_input', False)
+            # TODO correct this view now that it redirects to the next page if it is submitted
+            if filepath:
+                instance.organization_logo = filepath.read()
+                base64_logo = base64.encodebytes(instance.organization_logo).decode("utf-8")
+            else:
+                if cover_sheet_instance.organization_logo:
+                    instance.organization_logo = cover_sheet_instance.organization_logo
+                else:
+                    instance.organization_logo = None
+
+            instance.save()
+            summary_progress, created = summary_organization_progress.objects.get_or_create(
+                organization=find_user_organization(request.user.id))
+            summary_progress.organization_details = True
+            summary_progress.save()
+            return redirect('cover_sheets_service')
+
+    ready_to_submit = get_all_cover_sheet_steps_completed(org.id)
+    return render(request, 'pages/summary/cover_sheet_organization.html', {'form': form,
+                                                                           'org_name': org_name,
+                                                                           'base64_logo': base64_logo,
+                                                                           'year': get_current_summary_report_year(),
+                                                                           'notes': notes,
+                                                                           'new_note_form': new_note_form,
+                                                                           'ready_to_submit': ready_to_submit})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def cover_sheet_service_view(request):
+    user_profile_data = profile.objects.get(custom_user=request.user.id)
+    org = user_profile_data.organization
+    service_type = org.summary_organization_classifications
+
+    cover_sheet_instance, created = cover_sheet.objects.get_or_create(organization=org)
+
+    form = cover_sheet_service(instance=cover_sheet_instance)
+    ready_to_submit = get_all_cover_sheet_steps_completed(org.id)
+
+    if request.POST:
+        form = cover_sheet_service(data=request.POST, instance=cover_sheet_instance)
+
+        if form.is_valid():
+            print("valid")
+            form.save()
+            summary_progress, created = summary_organization_progress.objects.get_or_create(
+                organization=find_user_organization(request.user.id))
+            summary_progress.service_cover_sheet = True
+            summary_progress.save()
+
+            return redirect('submit_cover_sheet')
+        else:
+            print("Error")
+            for error in form.errors:
+                print(error)
+
+    return render(request, 'pages/summary/cover_sheet_service.html', {'service_type': service_type,
+                                                                      'form': form,
+                                                                      'ready_to_submit': ready_to_submit})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def submit_cover_sheet(request):
+    return render(request, 'pages/summary/submit_cover_sheet.html', {})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def submit_cover_sheet_submit(request):
+    user_org = find_user_organization(request.user.id)
+    ready_to_submit = get_all_cover_sheet_steps_completed(user_org.id)
+    if not ready_to_submit:
+        raise Http404("Your coversheet is not ready to be submitted. Please go through each tab and confirm your data has been updated.")
+
+    report_status = summary_report_status.objects.get(year=get_current_summary_report_year(), organization=user_org)
+    report_status.cover_sheet_submitted_for_review = True
+    report_status.cover_sheet_status = "With WSDOT"
+    report_status.save()
+
+    return redirect('summary_report_data')
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def cover_sheet_submitted(request):
+    cover_sheet_status = summary_report_status.objects.get(year=get_current_summary_report_year(), organization=find_user_organization(request.user.id)).cover_sheet_status
+    return render(request, 'pages/summary/cover_sheet_submitted.html', {'cover_sheet_status': cover_sheet_status})
 
 
 @login_required(login_url='/Panacea/login')
@@ -476,6 +1016,66 @@ def summary_report_data(request):
     return render(request, 'pages/summary/summary_report_data_instructions.html', {'ready_to_submit': ready_to_submit})
 
 
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def data_submitted(request):
+    data_status = summary_report_status.objects.get(year=get_current_summary_report_year(), organization=find_user_organization(request.user.id)).data_report_status
+    return render(request, 'pages/summary/data_submitted.html', {'data_status': data_status})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def summary_modes(request):
+    org = find_user_organization(request.user.id)
+
+    # TODO add in date time of changes and user id to this dataset date time as native, foreign key for user
+    if request.method == 'POST':
+        form = service_offered_form(data=request.POST)
+        if form.is_valid():
+            print(form.is_valid())
+            instance, created = service_offered.objects.get_or_create(organization_id=org.id,
+                                                                      transit_mode=form.cleaned_data["transit_mode"],
+                                                                      administration_of_mode=form.cleaned_data[
+                                                                          "administration_of_mode"])
+            if not created:
+                print("not created")
+                messages.error(request, "This name has already been added")
+    else:
+        form = service_offered_form()
+    print(form)
+    modes = service_offered.objects.filter(organization_id=org).all()
+    ready_to_submit = get_all_data_steps_completed(find_user_organization_id(request.user.id))
+    return render(request, 'pages/summary/summary_modes.html', {'form': form,
+                                                                'modes': modes,
+                                                                'org': org,
+                                                                'ready_to_submit': ready_to_submit})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def accept_modes(request):
+    org_progress, created = summary_organization_progress.objects.get_or_create(organization=find_user_organization(request.user.id))
+    org_progress.confirm_service = True
+    org_progress.save()
+    return redirect('summary_reporting')
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def delete_summary_mode(request, name, admin_of_mode):
+    if transit_mode.objects.filter(name=name).count() < 1:
+        raise ValueError("invalid name - transit mode")
+    elif admin_of_mode in transit_data.DO_OR_PT:
+        raise ValueError("invalid name - administration of mode")
+    else:
+        user_id = request.user.id
+        transit_mode_id = transit_mode.objects.get(name=name).id
+        user_org_id = profile.objects.get(custom_user_id=user_id).organization_id
+        service_to_delete = service_offered.objects.get(organization_id=user_org_id,
+                                                        administration_of_mode=admin_of_mode,
+                                                        transit_mode_id=transit_mode_id)
+        service_to_delete.delete()
+        return redirect('summary_modes')
 
 
 @login_required(login_url='/Panacea/login')
@@ -509,7 +1109,43 @@ def review_data(request):
                                                               'org_name': org_name, 'error_count': error_count})
 
 
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def summary_reporting(request, report_type=None, form_filter_1=None, form_filter_2=None):
+    user_org = find_user_organization(request.user.id)
 
+    if report_type is None:
+        report_type = "transit_data"
+
+    requested_form = SummaryDataEntryBuilder(report_type, user_org, form_filter_1=form_filter_1,
+                                             form_filter_2=form_filter_2)
+    if request.method == 'POST':
+        requested_form.save_with_post_data(request.POST)
+        return requested_form.go_to_next_form()
+
+    template_data = SummaryDataEntryTemplateData(requested_form, report_type)
+
+    ready_to_submit = get_all_data_steps_completed(find_user_organization_id(request.user.id))
+
+    return render(request, 'pages/summary/summary_reporting.html', {'template_data': template_data,
+                                                                    'ready_to_submit': ready_to_submit})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def submit_data(request):
+    ready_to_submit = get_all_data_steps_completed(find_user_organization_id(request.user.id))
+    return render(request, 'pages/summary/submit_data.html', {'ready_to_submit': ready_to_submit})
+
+
+@login_required(login_url='/Panacea/login')
+@group_required('Summary reporter', 'WSDOT staff')
+def submit_data_submit(request):
+    status = summary_report_status.objects.get(year=get_current_summary_report_year(), organization=find_user_organization(request.user.id))
+    status.data_report_submitted_for_review = True
+    status.data_report_status = "With WSDOT"
+    status.save()
+    return redirect('dashboard')
 
 
 @login_required(login_url='/Panacea/login')
@@ -540,6 +1176,121 @@ def contact_us(request):
 
     return render(request, 'pages/ContactUs.html', {'form':form})
 
+
+@login_required(login_url='/Panacea/login')
+def view_annual_operating_information(request):
+    current_year = get_current_summary_report_year()
+    years = [current_year-2, current_year-1, current_year]
+    current_user_id = request.user.id
+    user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
+    org_classification = organization.objects.get(id = user_org_id).summary_organization_classifications
+    df = build_operations_data_table(years, [user_org_id], org_classification)
+    heading_list = ['Annual Operating Information'] + years +['One Year Change (%)']
+    data = df.to_dict(orient = 'records')
+    return render(request, 'pages/summary/view_agency_report.html', {'data':data, 'years': heading_list})
+
+
+@login_required(login_url='/Panacea/login')
+def view_financial_information(request):
+    current_year = get_current_summary_report_year()
+    years = [current_year - 2, current_year - 1, current_year]
+    current_user_id = request.user.id
+    user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
+    org_classification = organization.objects.get(id=user_org_id).summary_organization_classifications
+    if str(org_classification) == 'Community provider':
+        revenuedf = build_community_provider_revenue_table(years, [user_org_id])
+    else:
+        revenuedf = build_revenue_table(years, [user_org_id], org_classification)
+    financial_data = revenuedf.to_dict(orient = 'records')
+    financial_heading_years = ['Financial Information'] + years + ['One Year Change(%)']
+    return render(request, 'pages/summary/view_financial_report.html', {'financial_data':financial_data, 'finance_years': financial_heading_years})
+
+
+@login_required(login_url='/Panacea/login')
+def view_rollup(request):
+    current_year = get_current_summary_report_year()
+    years = [current_year-2, current_year-1, current_year]
+    current_user_id = request.user.id
+    user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
+    rollup_data = build_total_funds_by_source(years, [user_org_id])
+    rollup_heading = ['Total Funds by Source'] + years + ['One Year Change (%)']
+    rollup_data = rollup_data.to_dict(orient = 'records')
+    return render(request, 'pages/summary/view_agency_rollup.html', {'rollup_data': rollup_data, 'rollup_heading': rollup_heading})
+
+
+@login_required(login_url='/Panacea/login')
+def view_statewide_measures(request):
+    years = [2013, 2014, 2015, 2016, 2017, 2018]
+    statewide_measure_list = []
+    list_of_headings = []
+    statewide_measure_dictionary = {'Revenue Vehicle Hours by Service Mode': ("Revenue Vehicle Hours"), 'Revenue Vehicle Miles by Service Mode': ('Revenue Vehicle Miles'),
+    'Passenger Trips by Service Mode':('Passenger Trips'), 'Farebox Revenues by Service Mode': ('Farebox Revenues'), 'Operating Expenses by Service Mode': ('Operating Expenses')}
+    for key, measure in statewide_measure_dictionary.items():
+        df = generate_performance_measure_table(measure, years)
+        heading_list = [key] + years + ['One Year Change (%)']
+        list_of_headings.append(heading_list)
+        statewide_measure_list.append(df.to_dict(orient = 'records'))
+    return render(request, 'pages/summary/view_statewide_measures.html', {'headings': list_of_headings, 'data': statewide_measure_list, 'titles': statewide_measure_dictionary.keys()})
+
+
+@login_required(login_url='/Panacea/login')
+def view_performance_measures(request):
+    years = [2013, 2014, 2015, 2016, 2017, 2018]
+    performance_measure_list = []
+    list_of_headings = []
+    performance_measure_dictionary = {
+    'Operating Costs per Passenger Trip': ('Operating Expenses', 'Passenger Trips'), 'Operating Cost per Revenue Vehicle Hour':('Operating Expenses', 'Revenue Vehicle Hours'),
+    'Passenger Trips per Revenue Vehicle Hour':('Passenger Trips', 'Revenue Vehicle Hours'), 'Passenger Trips per Revenue Vehicle Mile':('Passenger Trips', 'Revenue Vehicle Miles'),
+                                      'Revenue Vehicle Hours per Employee': ('Revenue Vehicle Hours', 'Employees - FTEs'), 'Farebox Recovery Ratio/Vanpool Revenue Recovery': ('Farebox Revenues', 'Operating Expenses')}
+    for key, measure in performance_measure_dictionary.items():
+        df = generate_performance_measure_table(measure, years)
+        heading_list = [key] + years + ['One Year Change (%)']
+        list_of_headings.append(heading_list)
+        performance_measure_list.append(df.to_dict(orient = 'records'))
+
+    return render(request, 'pages/summary/view_performance_measures.html', {'headings': list_of_headings, 'data': performance_measure_list, 'titles': performance_measure_dictionary.keys()})
+
+
+@login_required(login_url='/Panacea/login')
+def view_statewide_rollup(request):
+    year = 2017
+    revenue_df = create_statewide_revenue_table(year)
+    expense_df = create_statewide_expense_table(year)
+    return render(request, 'pages/summary/view_statewide_rollup.html')
+
+
+@login_required(login_url='/Panacea/login')
+def view_statewide_operating(request):
+    current_year = get_current_summary_report_year()
+    years = [current_year-2, current_year-1, current_year]
+    current_user_id = request.user.id
+    user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
+    org_classification = organization.objects.get(id = user_org_id).summary_organization_classifications
+    org_list = list(organization.objects.filter(summary_organization_classifications = org_classification).value_list('id', flat = True))
+    return render(request)
+
+
+@login_required(login_url='/Panacea/login')
+def view_statewide_revenue(request):
+    return render(request)
+
+
+@login_required(login_url='/Panacea/login')
+def view_statewide_investment_tables(request):
+    return render(request)
+
+
+@login_required(login_url='/Panacea/login')
+def view_statewide_statistics(request):
+    statewide_mode_statistics_list = []
+    list_of_headings = []
+    year = 2017
+    transit_mode_names = ['Fixed Route', 'Commuter Bus', 'Trolley Bus', 'Route Deviated', 'Demand Response', 'Vanpool', 'Commuter Rail', 'Light Rail', 'Streetcar']
+    for mode in transit_mode_names:
+        df, heading = generate_mode_by_agency_tables(mode, year)
+        statewide_mode_statistics_list.append(df.to_dict(orient = 'records'))
+        list_of_headings.append(heading)
+    return render(request, 'pages/summary/view_statewide_statistics.html', {'headings': list_of_headings, 'data':statewide_mode_statistics_list})
 
 
 @login_required(login_url='/Panacea/login')
@@ -696,7 +1447,7 @@ def wsdot_review_cover_sheets(request, year=None, organization_id=None):
                    'base64_logo': base64_logo})
 
 
-# TODO Come back through and change this to be object oriented code about a notes object that works for cover sheets and data. Sorry future me... I was running out of time/
+# TODO Come back through and change this to be object oriented code about a notes object.
 @login_required(login_url='/Panacea/login')
 def base_note(request):
     # this is used to build the base url to submit a new note it is never actually called.
@@ -771,6 +1522,7 @@ def add_cover_sheet_note_customer(request, year, note_area, note_field):
         url = reverse('cover_sheets_service')
     else:
         raise PermissionError
+
 
     if request.POST:
         form = add_cover_sheet_review_note(request.POST)

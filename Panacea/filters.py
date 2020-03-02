@@ -1,4 +1,4 @@
-from Panacea.vanpool.models import vanpool_expansion_analysis, vanpool_report
+from .models import vanpool_expansion_analysis, vanpool_report
 import django_filters
 
 
