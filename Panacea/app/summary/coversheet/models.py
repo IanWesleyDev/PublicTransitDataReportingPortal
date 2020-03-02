@@ -1,4 +1,6 @@
-from Panacea.models import *
+from django.db import models
+
+from Panacea.app.user_and_org.models import *
 
 
 class cover_sheet(models.Model):

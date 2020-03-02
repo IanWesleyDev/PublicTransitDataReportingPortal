@@ -2,7 +2,7 @@ from dateutil.relativedelta import relativedelta
 from django import forms
 
 from Panacea.vanpool.models import *
-from Panacea.shared_content.models import *
+from Panacea.user_and_org.models import *
 from Panacea.utilities import find_vanpool_organizations
 
 

@@ -15,13 +15,13 @@ from simple_history.models import HistoricalRecords
 
 
 # Load order of models matters
-from Panacea.shared_content.models import *
-from Panacea.vanpool.models import *
-from Panacea.summary.misc.models import *
-from Panacea.summary.coversheet.models import *
-from Panacea.summary.data_report.models import *
-from Panacea.summary.review_tracking.models import *
-from Panacea.summary.tables_and_reports.models import *
+from Panacea.app.user_and_org.models import *
+from Panacea.app.vanpool.models import *
+from Panacea.app.summary.misc.models import *
+from Panacea.app.summary.coversheet.models import *
+from Panacea.app.summary.data_report.models import *
+from Panacea.app.summary.review_tracking.models import *
+from Panacea.app.summary.tables_and_reports.models import *
 
 
 #TODO did I forget to include this table in the data entry?

@@ -13,9 +13,32 @@ from django import forms
 from django.forms import modelformset_factory, BaseModelFormSet, ModelForm
 
 
+class SummaryReport:
+    def __init__(self):
+        self.summary_tables = []
+
+    def add_table(self, summary_table):
+        self.summary_tables.append(summary_table)
+
+class SummaryTable:
+
+    def __init__(self):
+        self.table_components = []
+
+    def add_table_component(self, table_component):
+        self.table_components.append(table_component)
+
+class SummaryTableComponent:
+
+    def __init__(self, heading, data, calculate_subtotal):
+        self.heading = heading
+        self.data = data
+        self.calculate_subtotal = calculate_subtotal
+
 class SummaryBuilder:
 
     def __init__(self, report_type):
+        self.REPORT_TYPES = ['transit_data', 'revenue', 'expense', 'fund_balance']
         self.report_type = report_type
 
     def get_model(self):
@@ -92,12 +115,99 @@ class SummaryBuilder:
             return metric_model.__name__ + '_id'
 
 
-class SummaryDataEntryBuilder(SummaryBuilder):
+class ReportAgencyDataTableBuilder(SummaryBuilder):
+    def __init__(self, report_type, target_organization):
+        self.report_type = report_type
+        self.target_organization = target_organization
+        self.nav_filter_count, self.nav_filters = self.get_all_filters()
+
+    def get_metrics_for_agency_classification(self):
+        return self.get_metric_model().objects.filter(agency_classification=self.target_organization.summary_organization_classification)
+
+
+    def get_model_data_for_agency_classification(self):
+        # return self.get_metric_model_data().filter() filtered by get_metrics_for_agency_classification() and filters(may need to build dictionary or move the query dict up a class higher)
+        pass
+
+
+    def aggregate_data(self):
+        # filter by last three years and aggregate by year and metric
+        pass
+
+
+    def get_all_filters(self):
+        '''gets the data needed to build header navigation for filters'''
+        if self.report_type in ['transit_data', ]:
+            filter_count = 2
+            my_services_offered = service_offered.objects.filter(organization=self.target_organization).order_by(
+                'transit_mode__name')
+            filters = []
+            for service in my_services_offered:
+                filters.append([service.transit_mode.name, service.administration_of_mode])
+        elif self.report_type in ['revenue', ]:
+            filter_count = 2
+            revenues = revenue_source.objects.filter(
+                agency_classification=self.target_organization.summary_organization_classifications).values(
+                'government_type', 'funding_type').distinct()
+
+            filters = []
+            for source in revenues:
+                filters.append([source['government_type'], source['funding_type']])
+
+            revenue_list_order_type = ['Operating', 'Capital']
+            revenue_list_order_gov = ['Local', 'State', 'Federal', 'Other']
+            filters.sort(key=lambda x: revenue_list_order_type.index(x[1]))
+            filters.sort(key=lambda x: revenue_list_order_gov.index(x[0]))
+
+
+        elif self.report_type in ['expense', 'fund_balance', ]:
+            filter_count = 0
+            if self.report_type == 'expense':
+                filters = 'Expenses'
+            elif self.report_type == 'fund_balance':
+                filters = "Ending fund balances"
+        else:
+            raise Http404
+
+        return filter_count, filters
+
+
+
+
+
+
+class SummaryDataReportBuilder(ReportAgencyDataTableBuilder):
+
+    def __init__(self):
+        self.summary_report = summary_report()
+
+
+    def get_table_types_by_organization(self):
+        if self.target_organization.summary_organization_classifications == "Transit":
+            operating_report = SummaryTable()
+            for filters in self.nav_filters:
+                operating_report.add_table_component(self.nav_filters, self.aggregate_data, False)
+
+            summary_report.add_table(operating_report)
+
+
+
+        elif self.target_organization.summary_organization_classifications == "":
+            pass
+
+    def bui
+
+
+
+
+
+
+class SummaryDataEntryBuilder(ReportAgencyDataTableBuilder):
     '''This class constructs all of the forms needed to collect summary data'''
 
     def __init__(self, report_type, target_organization, form_filter_1=None, form_filter_2=None):
         super().__init__(report_type)
-        self.REPORT_TYPES = ['transit_data', 'revenue', 'expense', 'fund_balance']
+
 
         # self.report_type = report_type  # reports can be about revenue, transit data, expenses, and ending fund balances
         self.target_organization = target_organization  # the org submitting a report
@@ -108,7 +218,7 @@ class SummaryDataEntryBuilder(SummaryBuilder):
         self.max_form_increment = 0 #if the max increment is meet it will move to the next report type, otherwise it will go to the next set of filters
         self.current_increment = 0
 
-        self.nav_filter_count, self.nav_filters = self.get_header_navigation()
+
         self.set_default_form_filters()  # sets the starting filters for the form
         self.set_max_form_increment()
         self.set_current_increment()
@@ -263,7 +373,7 @@ class SummaryDataEntryBuilder(SummaryBuilder):
         return my_formset_factory
 
     def get_formset_query_dict(self):
-        '''Builds a dynamic dictionary used for querying the aproriate metrics giving the filter criteria and organization classification'''
+        '''Builds a dynamic dictionary used for querying the appropriate metrics giving the filter criteria and organization classification'''
         if self.report_type in ['transit_data', ]:
 
             query_dict = {'transit_mode__name': self.form_filter_1,
@@ -331,42 +441,6 @@ class SummaryDataEntryBuilder(SummaryBuilder):
                 i += 1
 
         return total_not_this_form
-
-    def get_header_navigation(self):
-        '''gets the data needed to build header navigation for filters'''
-        if self.report_type in ['transit_data', ]:
-            filter_count = 2
-            my_services_offered = service_offered.objects.filter(organization=self.target_organization).order_by(
-                'transit_mode__name')
-            filters = []
-            for service in my_services_offered:
-                filters.append([service.transit_mode.name, service.administration_of_mode])
-        elif self.report_type in ['revenue', ]:
-            filter_count = 2
-            revenues = revenue_source.objects.filter(
-                agency_classification=self.target_organization.summary_organization_classifications).values(
-                'government_type', 'funding_type').distinct()
-
-            filters = []
-            for source in revenues:
-                filters.append([source['government_type'], source['funding_type']])
-
-            revenue_list_order_type = ['Operating', 'Capital']
-            revenue_list_order_gov = ['Local', 'State', 'Federal', 'Other']
-            filters.sort(key=lambda x: revenue_list_order_type.index(x[1]))
-            filters.sort(key=lambda x: revenue_list_order_gov.index(x[0]))
-
-
-        elif self.report_type in ['expense', 'fund_balance', ]:
-            filter_count = 0
-            if self.report_type == 'expense':
-                filters = 'Expenses'
-            elif self.report_type == 'fund_balance':
-                filters = "Ending fund balances"
-        else:
-            raise Http404
-
-        return filter_count, filters
 
     def save_with_post_data(self, post_data):
         my_formset_factory = self.create_model_formset_factory()

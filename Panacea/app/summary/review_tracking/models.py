@@ -1,4 +1,7 @@
-from Panacea.models import *
+from django.db import models
+from simple_history.models import HistoricalRecords
+
+from Panacea.app.user_and_org.models import *
 
 
 class summary_report_status(models.Model):

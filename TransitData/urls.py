@@ -64,6 +64,7 @@ urlpatterns = [
     # VANPOOL
     path('vanpool/', include('Panacea.vanpool.urls')),
     # SUMMARY
+    # CoverSheet
     path('summary/instructions/', views.summary_instructions, name="summary_instructions"),
     path('summary/pick_up_where_you_left_off', views.pick_up_where_you_left_off, name="pick_up_where_you_left_off"),
     path('summary/cover_sheet_submitted/', views.cover_sheet_submitted, name="cover_sheet_submitted"),
