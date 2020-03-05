@@ -75,7 +75,7 @@ from .utilities import monthdelta, get_wsdot_color, get_vanpool_summary_charts_a
 from .tables import build_operations_data_table, build_investment_table, build_revenue_table, build_total_funds_by_source, build_community_provider_revenue_table
 from .validators import validation_test_for_transit_data
 from .statewide_tables import create_statewide_revenue_table, create_statewide_expense_table, generate_mode_by_agency_tables, generate_performance_measure_table
-
+from Panacea.table_builder import Summ
 
 # region shared_views
 def register(request):
@@ -1179,15 +1179,17 @@ def contact_us(request):
 
 @login_required(login_url='/Panacea/login')
 def view_annual_operating_information(request):
-    current_year = get_current_summary_report_year()
-    years = [current_year-2, current_year-1, current_year]
-    current_user_id = request.user.id
-    user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
-    org_classification = organization.objects.get(id = user_org_id).summary_organization_classifications
-    df = build_operations_data_table(years, [user_org_id], org_classification)
-    heading_list = ['Annual Operating Information'] + years +['One Year Change (%)']
-    data = df.to_dict(orient = 'records')
-    return render(request, 'pages/summary/view_agency_report.html', {'data':data, 'years': heading_list})
+    #current_year = get_current_summary_report_year()
+    #years = [current_year-2, current_year-1, current_year]
+    #current_user_id = request.user.id
+    #user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
+    #org_classification = organization.objects.get(id = user_org_id).summary_organization_classifications
+    #df = build_operations_data_table(years, [user_org_id], org_classification)
+    #heading_list = ['Annual Operating Information'] + years +['One Year Change (%)']
+    #data = df.to_dict(orient = 'records')
+
+
+    return render(request, 'pages/summary/view_agency_report.html')
 
 
 @login_required(login_url='/Panacea/login')
