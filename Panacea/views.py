@@ -5,7 +5,8 @@ import itertools
 import json
 import pandas as pd
 
-from Panacea.builders import SummaryDataEntryBuilder, SummaryDataEntryTemplateData, ConfigurationBuilder
+from Panacea.builders import SummaryDataEntryBuilder, SummaryDataEntryTemplateData, ConfigurationBuilder, \
+    SummaryBuilder, SummaryDataReportBuilder, SummaryTable, SummaryTableComponent, ReportAgencyDataTableBuilder
 from .validators import validation_test_for_transit_data
 
 from django.contrib import messages
@@ -75,7 +76,7 @@ from .utilities import monthdelta, get_wsdot_color, get_vanpool_summary_charts_a
 from .tables import build_operations_data_table, build_investment_table, build_revenue_table, build_total_funds_by_source, build_community_provider_revenue_table
 from .validators import validation_test_for_transit_data
 from .statewide_tables import create_statewide_revenue_table, create_statewide_expense_table, generate_mode_by_agency_tables, generate_performance_measure_table
-from Panacea.table_builder import Summ
+
 
 # region shared_views
 def register(request):
@@ -1179,17 +1180,18 @@ def contact_us(request):
 
 @login_required(login_url='/Panacea/login')
 def view_annual_operating_information(request):
-    #current_year = get_current_summary_report_year()
-    #years = [current_year-2, current_year-1, current_year]
-    #current_user_id = request.user.id
-    #user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
-    #org_classification = organization.objects.get(id = user_org_id).summary_organization_classifications
+    current_year = get_current_summary_report_year()
+    years = [current_year-2, current_year-1, current_year]
+    current_user_id = request.user.id
+    user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
+    org_classification = organization.objects.get(id = user_org_id).summary_organization_classifications
     #df = build_operations_data_table(years, [user_org_id], org_classification)
     #heading_list = ['Annual Operating Information'] + years +['One Year Change (%)']
     #data = df.to_dict(orient = 'records')
-
-
-    return render(request, 'pages/summary/view_agency_report.html')
+    report = ReportAgencyDataTableBuilder('transit_data', user_org_id)
+    operating_report = report.get_table_types_by_organization()
+    heading = ['Annual Operating Information'] + years + ['One Year Change (%)']
+    return render(request, 'pages/summary/view_agency_report.html', {'data':operating_report.table_components, 'heading': heading})
 
 
 @login_required(login_url='/Panacea/login')
@@ -1198,14 +1200,16 @@ def view_financial_information(request):
     years = [current_year - 2, current_year - 1, current_year]
     current_user_id = request.user.id
     user_org_id = profile.objects.get(custom_user_id=current_user_id).organization_id
-    org_classification = organization.objects.get(id=user_org_id).summary_organization_classifications
-    if str(org_classification) == 'Community provider':
-        revenuedf = build_community_provider_revenue_table(years, [user_org_id])
-    else:
-        revenuedf = build_revenue_table(years, [user_org_id], org_classification)
-    financial_data = revenuedf.to_dict(orient = 'records')
+   # org_classification = organization.objects.get(id=user_org_id).summary_organization_classifications
+    #if str(org_classification) == 'Community provider':
+     #   revenuedf = build_community_provider_revenue_table(years, [user_org_id])
+    #else:
+     #   revenuedf = build_revenue_table(years, [user_org_id], org_classification)
+    #financial_data = revenuedf.to_dict(orient = 'records')
+    report = ReportAgencyDataTableBuilder('revenue', user_org_id)
+    finance_report = report.get_table_types_by_organization()
     financial_heading_years = ['Financial Information'] + years + ['One Year Change(%)']
-    return render(request, 'pages/summary/view_financial_report.html', {'financial_data':financial_data, 'finance_years': financial_heading_years})
+    return render(request, 'pages/summary/view_financial_report.html')
 
 
 @login_required(login_url='/Panacea/login')

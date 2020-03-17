@@ -8,6 +8,7 @@ from django.shortcuts import redirect
 
 from Panacea.models import service_offered, revenue, transit_data, expense, fund_balance, revenue_source, \
     transit_metrics, expense_source, fund_balance_type, transit_mode, summary_organization_progress, organization
+
 from Panacea.utilities import get_current_summary_report_year, get_all_data_steps_completed
 from django import forms
 from django.forms import modelformset_factory, BaseModelFormSet, ModelForm
@@ -568,5 +569,251 @@ class ConfigurationBuilder(SummaryBuilder):
         my_formset_factory = self.create_model_formset_factory()
         my_formset = my_formset_factory(queryset=self.get_query_set(), **kwargs)
         return my_formset
+
+
+
+
+
+
+# what i need is a set of dictionaries/querysets in the correct order
+# I need the following special capabilities:
+# 1) create special rows/tables based on the type of data that is being queried
+# 2) dynamically create headings based on the data that is pulled
+# 3) preserve spacing and indentation norms
+# 4) follow a particular order of display that can change based on report type, separate for ferry/transit/tribe and cp
+# 5) have to be able to join created fields to queried field
+# 6)
+
+
+
+
+
+
+
+
+
+
+class SummaryBuilder:
+
+    def __init__(self, report_type):
+        self.REPORT_TYPES = ['transit_data', 'revenue', 'expense', 'fund_balance']
+        self.report_type = report_type
+
+    def get_current_report_year(self):
+        current_year = get_current_summary_report_year()
+        years = [current_year-2, current_year-1, current_year]
+        return years
+
+
+    def get_model(self):
+        '''returns the appropriate model for the given report type'''
+        if self.report_type == "revenue":
+            return revenue
+        elif self.report_type == "transit_data":
+            return transit_data
+        elif self.report_type == "expense":
+            return expense
+        elif self.report_type == "fund_balance":
+            return fund_balance
+        else:
+            raise Http404("Report type does not exist. -4")
+
+    def get_model_data(self):
+        '''returns the appropriate model for the given report type'''
+        if self.report_type == "revenue":
+            return revenue.objects.filter(revenue_source__inactive_flag=False)
+        elif self.report_type == "transit_data":
+            return transit_data.objects
+        elif self.report_type == "expense":
+            return expense.objects
+        elif self.report_type == "fund_balance":
+            return fund_balance.objects
+        else:
+           raise Http404("Report type does not exist. -4")
+
+    def get_metric_model(self):
+        '''returns the appropriate metric model for the given report type'''
+        if self.report_type == "revenue":
+            return revenue_source
+        elif self.report_type == "transit_data":
+            return transit_metrics
+        elif self.report_type == "expense":
+            return expense_source
+        elif self.report_type == "fund_balance":
+            return fund_balance_type
+        else:
+            raise Http404("Report type does not exist. -5")
+
+    def get_metric_model_data(self):
+        '''returns the appropriate metric model for the given report type'''
+        if self.report_type == "revenue":
+            return revenue_source.objects.filter(inactive_flag=False)
+        elif self.report_type == "transit_data":
+            return transit_metrics.objects
+        elif self.report_type == "expense":
+            return expense_source.objects
+        elif self.report_type == "fund_balance":
+            return fund_balance_type.objects
+        else:
+            raise Http404("Report type does not exist. -5")
+
+    def get_metric_model_name(self):
+        '''Returns the metric model as a string.'''
+        if self.report_type == "revenue":
+            return 'revenue_source'
+        elif self.report_type == "transit_data":
+            return 'transit_metric'
+        elif self.report_type == "expense":
+            return 'expense_source'
+        elif self.report_type == "fund_balance":
+            return 'fund_balance_type'
+        else:
+            raise Http404("Report type does not exist. -6")
+
+    def get_metric_id_field_name(self):
+        '''Returns the name of the field name of the id field in the metric model as a string.'''
+        if self.report_type == "transit_data":
+            return 'transit_metric_id'
+        else:
+            metric_model = self.get_metric_model()
+            return metric_model.__name__ + '_id'
+
+
+class ReportAgencyDataTableBuilder(SummaryBuilder):
+    def __init__(self, report_type, target_organization):
+        super().__init__(report_type)
+        self.REPORT_TYPES = ['transit_data', 'revenue', 'expense', 'fund_balance']
+        self.years = self.get_current_report_year()
+        self.report_type = report_type
+        self.target_organization = target_organization
+        self.services_offered = self.get_all_services_offered()
+        self.summary_report = SummaryReport()
+        self.data = self.get_model_data_for_agency()
+        self.heading_list = []
+        self.agency_classification = self.get_agency_classification()
+        self.metrics = self.get_metrics_for_agency_classification()
+        self.current_report_year = max(self.years)
+        self.last_report_year = self.current_report_year-1
+
+
+    def get_metrics_for_agency_classification(self):
+        return self.get_metric_model().objects.filter(agency_classification = self.agency_classification).order_by('order_in_summary')
+
+
+    def get_model_data_for_agency(self):
+        return self.get_model_data().filter(organization_id = self.target_organization, year__in = self.years)
+        #filtered by get_metrics_for_agency_classification() and filters(may need to build dictionary or move the query dict up a class higher)
+
+    def get_metric_model_fields(self):
+        return self.get_metric_model_data().all()
+
+    def get_agency_classification(self):
+        return organization.objects.get(id = self.target_organization).summary_organization_classifications_id
+
+
+    def aggregate_data(self):
+        # filter by last three years and aggregate by year and metric
+        pass
+
+
+
+    def get_all_services_offered(self):
+        '''gets the data needed to build header navigation for filters'''
+        if self.report_type in ['transit_data', ]:
+            services_offered = service_offered.objects.filter(organization_id =self.target_organization, service_mode_discontinued=False).order_by('transit_mode_id')
+            return services_offered
+        elif self.report_type in ['expense', 'fund_balance', 'revenue']:
+            pass
+        else:
+            raise Http404
+
+    def get_table_types_by_organization(self):
+        if self.report_type == 'transit_data':
+            operating_report = SummaryTable()
+            for service in self.services_offered:
+                heading = [('transit_metric', '{} ({})'.format(service.transit_mode.name, service.administration_of_mode)), ('year1', ''), ('year2', ''), ('year3', ''), ('percent_change', ''), ('role', 'heading')]
+                heading = dict(heading)
+                operating_report.add_row_component(heading)
+                for metric in list(self.metrics):
+                    op_data = self.data.filter(administration_of_mode = service.administration_of_mode, transit_mode_id = service.transit_mode_id, transit_metric__name = metric).values('reported_value').order_by('year')
+                    if not op_data:
+                        continue
+                    op_data_list = []
+                    check_list = []
+                    count = 1
+                    op_data = list(op_data)
+                    for k in op_data:
+                        op_data_list.append(('year{}'.format(count),k['reported_value']))
+                        check_list.append(k['reported_value'])
+                        count+=1
+                    if list(set(check_list)) == [None]:
+                        continue
+                    percent_change = ((self.data.get(administration_of_mode = service.administration_of_mode, transit_mode_id = service.transit_mode_id, transit_metric__name = metric, year = self.current_report_year).reported_value - self.data.get(administration_of_mode = service.administration_of_mode, transit_mode_id = service.transit_mode_id, transit_metric__name = metric, year = self.last_report_year
+                                    ).reported_value)/self.data.get(administration_of_mode = service.administration_of_mode, transit_mode_id = service.transit_mode_id, transit_metric__name = metric, year = self.last_report_year).reported_value)*100
+                    op_data = [('transit_metric', str(metric))] + op_data_list + [('percent_change',percent_change), ('role', 'body')]
+                    op_data = dict(op_data)
+                    operating_report.add_row_component(op_data)
+            return operating_report
+        elif self.report_type == 'revenue':
+            revenue_report = SummaryReport()
+            revenue_values = self.data.values('revenue_source__government_type', 'revenue_source__funding_type').distinct()
+            revenue_values = list(revenue_values)
+            vals = [tuple(i.values()) for i in revenue_values]
+            print(vals)
+            return revenue_report
+
+
+
+class SummaryReport:
+    def __init__(self):
+        self.summary_tables = {}
+
+    def add_table(self, summary_table):
+        self.summary_tables.update(summary_table)
+
+class SummaryTable:
+
+    def __init__(self):
+        self.table_components = []
+
+    def add_row_component(self, table_component):
+        self.table_components.append(table_component)
+
+
+class SummaryTableComponent:
+
+    def __init__(self,  data):
+        self.data = data
+
+
+
+
+class SummaryDataReportBuilder(ReportAgencyDataTableBuilder):
+
+    def __init__(self):
+        self.summary_report = SummaryReport()
+        self.data = self.get_model_data_for_agency()
+
+
+    def get_table_types_by_organization(self):
+        if self.target_organization[0].summary_organization_classifications == "Transit":
+            operating_report = SummaryTable()
+            for service in self.services_offered:
+                op_data = self.data.filter(administration_of_mode = service.administration_of_mode, transit_mode_id = service.transit_mode_id).order_by('transit_metrics.order_in_summary')
+                # gonna need to add a heading in here
+                print(op_data)
+                operating_report.add_table_component(op_data)
+
+            SummaryReport.add_table(operating_report)
+
+
+
+        else:
+            pass
+
+
+#    def build
+
+
 
 
