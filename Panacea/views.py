@@ -1209,7 +1209,7 @@ def view_financial_information(request):
     report = ReportAgencyDataTableBuilder('revenue', user_org_id)
     finance_report = report.get_table_types_by_organization()
     financial_heading_years = ['Financial Information'] + years + ['One Year Change(%)']
-    return render(request, 'pages/summary/view_financial_report.html')
+    return render(request, 'pages/summary/view_financial_report.html', {'financial_data': finance_report.table_components, 'finance_years': financial_heading_years })
 
 
 @login_required(login_url='/Panacea/login')
