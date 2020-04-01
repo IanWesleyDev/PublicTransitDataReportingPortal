@@ -367,10 +367,13 @@ class revenue(models.Model):
     comments = models.TextField(blank=True, null=True)
     history = HistoricalRecords()
 
+    class Meta:
+        constraints = [
+            UniqueConstraint(fields=['organization', 'year', 'revenue_source'], name='unique_source_report'),
+        ]
 
-# class revenue_subfund(models.Model):
-#     revenue = models.ForeignKey(revenue, on_delete=models.PROTECT, related_name='+')
-#     specification = models.TextField(blank=False, null=True)
+
+
 
 class expense_source(models.Model):
     name = models.CharField(max_length=100)
@@ -395,10 +398,6 @@ class expense(models.Model):
             UniqueConstraint(fields=['organization', 'year', 'expense_source'], name='unique_source_report'),
         ]
 
-
-# class expense_subfund(models.Model):
-#     expense = models.ForeignKey(expense, on_delete=models.PROTECT, related_name='+')
-#     subfund_specification = models.TextField(blank=False, null=True)
 
 
 class transit_metrics(models.Model):
@@ -443,7 +442,7 @@ class transit_data(models.Model):
     year = models.IntegerField()
     transit_mode = models.ForeignKey(transit_mode, on_delete=models.PROTECT, related_name='+')
     # TODO remove rollup_mode
-    rollup_mode = models.ForeignKey(rollup_mode, on_delete=models.PROTECT,  related_name='+', blank=True, null=True)
+    rollup_mode = models.ForeignKey(rollup_mode, on_delete=models.CASCADE,  related_name='+', blank=True, null=True)
     administration_of_mode = models.CharField(max_length=80, choices=DO_OR_PT)
     transit_metric = models.ForeignKey(transit_metrics, on_delete=models.PROTECT, related_name='+')
     reported_value = models.FloatField(blank=True, null=True)
