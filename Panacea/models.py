@@ -352,7 +352,6 @@ class revenue_source(models.Model):
     government_type = models.CharField(max_length=100, choices=LEVIATHANS, null=True, blank=True)
     funding_type = models.CharField(max_length=30, choices=FUNDING_KIND, null=True, blank=True)
     agency_classification = models.ManyToManyField(summary_organization_type, blank=True)
-    heading = models.CharField(max_length = 200, null=True, blank = True)
     inactive_flag = models.BooleanField(default=False, choices=TRUE_FALSE_CHOICES)
 
     def __str__(self):
@@ -366,6 +365,8 @@ class revenue(models.Model):
     report_by = models.ForeignKey(custom_user, on_delete=models.PROTECT, blank=True, null=True)
     comments = models.TextField(blank=True, null=True)
     history = HistoricalRecords()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         constraints = [
@@ -377,7 +378,6 @@ class revenue(models.Model):
 
 class expense_source(models.Model):
     name = models.CharField(max_length=100)
-    heading = models.CharField(max_length=200, null=True, blank=True)
     agency_classification = models.ManyToManyField(summary_organization_type, blank=True)
 
     def __str__(self):
@@ -391,7 +391,9 @@ class expense(models.Model):
     reported_value = models.IntegerField(blank=True, null=True)
     report_by = models.ForeignKey(custom_user, on_delete=models.PROTECT, blank=True, null=True)
     comments = models.TextField(blank=True, null=True)
-    # history = HistoricalRecords()
+    history = HistoricalRecords()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         constraints = [
@@ -423,14 +425,6 @@ class transit_mode(models.Model):
     def __str__(self):
         return self.name
 
-#TODO remove this table
-class rollup_mode(models.Model):
-    name = models.CharField(max_length=80)
-
-    def __str__(self):
-        return self.name
-
-
 class transit_data(models.Model):
 
     DO_OR_PT = (
@@ -441,24 +435,23 @@ class transit_data(models.Model):
     organization = models.ForeignKey(organization, on_delete=models.PROTECT, related_name='+')
     year = models.IntegerField()
     transit_mode = models.ForeignKey(transit_mode, on_delete=models.PROTECT, related_name='+')
-    # TODO remove rollup_mode
-    rollup_mode = models.ForeignKey(rollup_mode, on_delete=models.CASCADE,  related_name='+', blank=True, null=True)
     administration_of_mode = models.CharField(max_length=80, choices=DO_OR_PT)
     transit_metric = models.ForeignKey(transit_metrics, on_delete=models.PROTECT, related_name='+')
     reported_value = models.FloatField(blank=True, null=True)
     report_by = models.ForeignKey(custom_user, on_delete=models.PROTECT, blank=True, null=True)
     comments = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     history = HistoricalRecords()
 
-    #TODO make this contraint work
 
-    # class Meta:
-    #     unique_together = ['year', 'transit_mode', 'transit_metric', 'organization', 'administration_of_mode']
+    class Meta:
+        constraints = [
+            UniqueConstraint(fields= ['year', 'transit_mode', 'transit_metric', 'organization', 'administration_of_mode'], name = 'unique_transit_data') ]
 
 
 class fund_balance_type(models.Model):
     name = models.CharField(max_length=100)
-    heading = models.CharField(max_length=50, default = 'Ending Balances, December 31')
     agency_classification = models.ManyToManyField(summary_organization_type, blank=True)
 
     def __str__(self):
@@ -472,7 +465,8 @@ class fund_balance(models.Model):
     reported_value = models.IntegerField(blank=True, null=True)
     report_by = models.ForeignKey(custom_user, on_delete=models.PROTECT, blank=True, null=True)
     comments = models.TextField(blank=True, null=True)
-    heading = models.CharField(max_length= 50, blank=True, null=True, default = 'Ending Balances, December 31')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     history = HistoricalRecords()
 
     class Meta:
@@ -505,6 +499,7 @@ class cover_sheet(models.Model):
     organization_logo = models.BinaryField(editable=True, blank=True, null=True)
     published_version = models.BooleanField(blank=True, null=True, default=False)
     history = HistoricalRecords()
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         constraints = [
@@ -548,6 +543,14 @@ class service_offered(models.Model):
     organization = models.ForeignKey(organization, on_delete=models.PROTECT, blank=True, null=False)
     service_mode_discontinued = models.BooleanField(default=False, blank=False, null = False)
 
+    class Meta:
+        constraints = [
+            UniqueConstraint(fields=['organization', 'transit_mode', 'administration_of_mode'], name='unique_service_offered'),
+        ]
+
+
+
+
 
 
 
@@ -559,6 +562,13 @@ class depreciation(models.Model):
     report_by = models.ForeignKey(custom_user, on_delete=models.PROTECT, blank=True, null=True)
     comments = models.TextField(blank=True, null=True)
     history = HistoricalRecords()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        constraints = [
+            UniqueConstraint(fields=['organization', 'year', 'reported_value'], name='unique_depreciation'),
+        ]
+
 
 
 
@@ -592,6 +602,13 @@ class statewide_measures(models.Model):
     transit_data_files = models.CharField(max_length=500, blank=True, null=True)
     data_type = models.CharField(max_length=40, null=True, blank=True)
     measure_type = models.CharField(max_length=40, null=True, blank = True)
+
+
+class service_area_population(models.Model):
+    population = models.IntegerField(blank=False, null=False)
+    year = models.IntegerField(blank=False, null=False)
+    organization = models.ForeignKey(organization, on_delete=models.PROTECT, blank=True, null=True)
+
 
 
 
