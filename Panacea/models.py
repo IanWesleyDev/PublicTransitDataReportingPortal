@@ -53,8 +53,8 @@ class custom_user(AbstractUser):
     # User authentication from tut located here:https://wsvincent.com/django-custom-user-model-tutorial/
     username = None
     email = models.EmailField(_('email address'), unique=True)  # changes email to unique and blank to false
-    random_field = models.CharField(max_length=80, blank=True)
-
+    saw_id = models.CharField(max_length=255, blank=True, null=True)
+    wsdot_sso_id = models.CharField(max_length=255, blank=True, null=True)
     objects = CustomUserManager()
 
     USERNAME_FIELD = 'email'
@@ -664,6 +664,13 @@ class summary_organization_progress(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['organization'], name='unique_status'),
         ]
+
+class tax_rates(models.Model):
+    governance_structure = models.CharField(max_length=50, blank=True, null=True)
+    year_established = models.IntegerField(blank=True, null=True)
+    tax_rate = models.DecimalField(decimal_places=1, max_digits=5, blank=True, null=True)
+    last_tax_rate_increase = models.CharField(max_length=30, blank=True, null=True)
+    organization = models.ForeignKey(organization, on_delete=models.PROTECT)
 
 
 class cover_sheet_review_notes(models.Model):

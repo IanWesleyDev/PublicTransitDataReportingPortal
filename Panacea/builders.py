@@ -783,13 +783,20 @@ class ReportAgencyDataTableBuilder(SummaryBuilder):
                     count = 1
                     op_data = list(op_data)
                     for k in op_data:
+                        if k['reported_value'] == None:
+                            k['reported_value'] = 0
                         op_data_list.append(('year{}'.format(count),k['reported_value']))
                         check_list.append(k['reported_value'])
                         count+=1
-                    if list(set(check_list)) == [None]:
+                    if list(set(check_list)) == [0]:
                         continue
-                    percent_change = ((self.data.get(administration_of_mode = service.administration_of_mode, transit_mode_id = service.transit_mode_id, transit_metric__name = metric, year = self.current_report_year).reported_value - self.data.get(administration_of_mode = service.administration_of_mode, transit_mode_id = service.transit_mode_id, transit_metric__name = metric, year = self.last_report_year
-                                    ).reported_value)/self.data.get(administration_of_mode = service.administration_of_mode, transit_mode_id = service.transit_mode_id, transit_metric__name = metric, year = self.last_report_year).reported_value)*100
+                    try:
+                        percent_change = ((op_data_list[-1][1] - op_data_list[-2][1])/op_data_list[-2][1])*100
+                    except ZeroDivisionError:
+                        if op_data_list[-1][1] == op_data_list[-2][1] == 0:
+                            percent_change = 0.00
+                        else:
+                            percent_change = 100.00
                     op_data = [('transit_metric', str(metric))] + op_data_list + [('percent_change',percent_change), ('role', 'body')]
                     op_data = dict(op_data)
                     operating_report.add_row_component(op_data)
