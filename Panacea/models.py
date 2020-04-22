@@ -2,7 +2,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser, BaseUserManager, Group  ## A new class is imported. ##
 from django.core.validators import MaxValueValidator
 from django.db import models
-from django.db.models import UniqueConstraint
 from django.db.models.functions import datetime
 from django.utils.translation import ugettext_lazy as _
 from django.db.models.signals import post_save
@@ -339,7 +338,8 @@ class revenue_source(models.Model):
 
     FUNDING_KIND = (
         ('Capital', 'Capital'),
-        ('Operating', 'Operating')
+        ('Operating', 'Operating'),
+        ('Other', 'Other')
     )
 
     TRUE_FALSE_CHOICES = (
@@ -369,9 +369,7 @@ class revenue(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [
-            UniqueConstraint(fields=['organization', 'year', 'revenue_source'], name='unique_source_report'),
-        ]
+        unique_together=('organization', 'year', 'revenue_source', )
 
 
 
@@ -396,9 +394,7 @@ class expense(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [
-            UniqueConstraint(fields=['organization', 'year', 'expense_source'], name='unique_source_report'),
-        ]
+        unique_together = ('organization', 'year', 'expense_source', )
 
 
 
@@ -446,8 +442,7 @@ class transit_data(models.Model):
 
 
     class Meta:
-        constraints = [
-            UniqueConstraint(fields= ['year', 'transit_mode', 'transit_metric', 'organization', 'administration_of_mode'], name = 'unique_transit_data') ]
+        unique_together = ('year', 'transit_mode', 'transit_metric', 'organization', 'administration_of_mode')
 
 
 class fund_balance_type(models.Model):
@@ -470,13 +465,11 @@ class fund_balance(models.Model):
     history = HistoricalRecords()
 
     class Meta:
-        constraints = [
-            UniqueConstraint(fields=['organization', 'year', 'fund_balance_type'], name='unique_end_balance'),
-        ]
+        unique_together = ('organization', 'year', 'fund_balance_type', )
 
 
 class cover_sheet(models.Model):
-    organization = models.ForeignKey(organization, on_delete=models.PROTECT, blank=True, null=True)
+    organization = models.ForeignKey(organization, on_delete=models.PROTECT, blank=True, null=True, unique=True)
     executive_officer_first_name = models.CharField(max_length=50, blank=True, null=True)
     executive_officer_last_name = models.CharField(max_length=50, blank=True, null=True)
     executive_officer_title = models.CharField(max_length=50, blank=True, null=True)
@@ -501,10 +494,7 @@ class cover_sheet(models.Model):
     history = HistoricalRecords()
     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=['organization'], name="unique_organization")
-        ]
+
 
     def is_identical_to_published_version(self):
         try:
@@ -544,9 +534,7 @@ class service_offered(models.Model):
     service_mode_discontinued = models.BooleanField(default=False, blank=False, null = False)
 
     class Meta:
-        constraints = [
-            UniqueConstraint(fields=['organization', 'transit_mode', 'administration_of_mode'], name='unique_service_offered'),
-        ]
+        unique_together = ('organization', 'transit_mode', 'administration_of_mode')
 
 
 
@@ -565,9 +553,7 @@ class depreciation(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     class Meta:
-        constraints = [
-            UniqueConstraint(fields=['organization', 'year', 'reported_value'], name='unique_depreciation'),
-        ]
+        unique_together = ('organization', 'year', 'reported_value')
 
 
 
@@ -585,7 +571,7 @@ class validation_errors(models.Model):
     error_resolution = models.TextField(blank=True, null=True)
 
     class Meta:
-        unique_together = ['year', 'transit_mode', 'administration_of_mode', 'organization', 'error']
+        unique_together = ('year', 'transit_mode', 'administration_of_mode', 'organization', 'error',)
 
 
 class stylesheets(models.Model):
@@ -661,15 +647,18 @@ class summary_organization_progress(models.Model):
     ending_balances = models.BooleanField(default=False)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=['organization'], name='unique_status'),
-        ]
+       unique_together = ('organization')
 
 class tax_rates(models.Model):
     governance_structure = models.CharField(max_length=50, blank=True, null=True)
     year_established = models.IntegerField(blank=True, null=True)
     tax_rate = models.DecimalField(decimal_places=1, max_digits=5, blank=True, null=True)
     last_tax_rate_increase = models.CharField(max_length=30, blank=True, null=True)
+    organization = models.ForeignKey(organization, on_delete=models.PROTECT)
+
+
+class intercity_bus_lines(models.Model):
+    intercity_bus_line = models.CharField(max_length=50, blank=True, null=True)
     organization = models.ForeignKey(organization, on_delete=models.PROTECT)
 
 
@@ -708,6 +697,17 @@ class cover_sheet_review_notes(models.Model):
                 parent_note.save()
 
         super(cover_sheet_review_notes, self).save(*args, **kwargs)
+
+
+class tribal_reporter_permissions(models.Model):
+    year = models.IntegerField()
+    organization = models.ForeignKey(organization, on_delete=models.PROTECT)
+    permission_to_publish_coversheet = models.BooleanField(default=False)
+    permission_to_publish_ntd_data = models.BooleanField(default=False, verbose_name="Permission to publish NTD data")
+    permission_to_publish_reported_data = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('year', 'organization',)
 
 # class ending_balance_categories(models.Model):
 #     ending_balance_category = models.CharField(max_length=100, blank=False, null = False)

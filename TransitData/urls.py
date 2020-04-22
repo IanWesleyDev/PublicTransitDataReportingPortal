@@ -16,7 +16,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
-from Panacea import views
+from Panacea import views, views_SAML_SAW
 from Panacea import views_SAML
 from django.conf.urls import url
 
@@ -90,6 +90,7 @@ urlpatterns = [
     path('summary/report_data/', views.summary_reporting, name='summary_reporting'),
     path('summary/report_data/<report_type>', views.summary_reporting, name='summary_reporting_type'),
     path('summary/report_data/<report_type>/<form_filter_1>/<form_filter_2>', views.summary_reporting, name='summary_reporting_filters'),
+    path('summary/you_skipped_a_step', views.you_skipped_a_step, name='you_skipped_a_step'),
     path('summary/submit_data', views.submit_data, name="submit_data"),
     path('summary/submit_data/submit', views.submit_data_submit, name="submit_data_submit"),
     path('summary/admin/configure_agency_types/', views.configure_agency_types, name='summary_configure_agency_types'),
@@ -121,16 +122,23 @@ urlpatterns = [
     path('summary/admin/wsdot_review_cover_sheet/delete_note/<int:note_id>', views.delete_cover_sheet_note, name="delete_cover_sheet_note"),
     path('summary/admin/wsdot_review_cover_sheet/approve_cover_sheet/<int:summary_report_status_id>', views.approve_cover_sheet, name="approve_cover_sheet"),
     path('summary/admin/wsdot_review_cover_sheet/return_cover_sheet_to_user/<int:summary_report_status_id>', views.return_cover_sheet_to_user, name="return_cover_sheet_to_user"),
-    path('summary/admin/review_cover_sheets', views.wsdot_review_data, name="wsdot_review_data"),
     path('summary/admin/review_cover_sheets/add_note/<int:parent_note>/', views.add_cover_sheet_child_note_customer, name="add_cover_sheet_child_note_customer"),
     path('summary/review_organization_information', views.customer_review_cover_sheets, name="customer_review_cover_sheets"),
     path('summary/customer_review_data', views.customer_review_data, name="customer_review_data"),
     path('summary/customer_review_instructions', views.customer_review_instructions, name="customer_review_instructions"),
+    path('summary/customer/review_cover_sheet/return_to_wsdot/<int:year>/<int:organization_id>', views.send_coversheet_back_to_wsdot, name='send_coversheet_back_to_wsdot'),
     path('summary/customer_review/accept_edit/accept_wsdot_edit/<int:note_id>', views.accept_wsdot_edit, name="accept_wsdot_edit"),
+    path('summary/admin/wsdot_review_data_submittal', views.wsdot_review_data_submittal, name="wsdot_review_data_submittal"),
+    path('summary/admin/wsdot_review_data_submittal/<int:year>', views.wsdot_review_data_submittal, name="wsdot_review_data_submittal_year"),
+    path('summary/admin/wsdot_review_data_submittal/<int:year>/<int:organization_id>', views.wsdot_review_data_submittal, name="wsdot_review_data_submittal_year_org"),
+    path('summary/admin/wsdot_review_data_submittal/approve_data_submittal/<int:summary_report_status_id>', views.approve_data_submittal, name="approve_data_submittal"),
+    path('summary/admin/wsdot_review_data_submittal/return_data_submittal_to_user/<int:summary_report_status_id>', views.return_data_submittal_to_user, name="return_data_submittal_to_user"),
     path('logged_in/', views.your_logged_in, name='your_logged_in'),
     path('login_denied/', views.login_denied, name='login_denied'),
     path('sso/wsdot/', views_SAML.signin, name="wsdot_sso"),
     path('sso/wsdot/reply/', views_SAML.wsdot, name="wsdot_sso_reply"),
+    path('sso/saw/', views_SAML_SAW.signin, name="saw_sso"),
+    path('sso/saw/acs/', views_SAML_SAW.acs, name="saw_sso_acs"),
     # path('summary/test', views.test, name='test'),
 
 ]

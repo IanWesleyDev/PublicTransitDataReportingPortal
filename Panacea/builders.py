@@ -229,7 +229,7 @@ class SummaryDataEntryBuilder(SummaryBuilder):
                     for m in missing_metrics:
                         model.create(**self.get_create_metric_dictionary(m))
 
-        form_metrics = model.filter(organization=self.target_organization)
+        form_metrics = model.filter(organization=self.target_organization).order_by(self.get_metric_id_field_name() + '__name')
         return form_metrics
 
     def get_widgets(self):
@@ -297,15 +297,15 @@ class SummaryDataEntryBuilder(SummaryBuilder):
         i = 0
         for year_x in ['this_year', 'previous_year', 'two_years_ago']:
             formsets[year_x] = my_formset_factory(
-                queryset=form_querysets.filter(year=self.year - i).order_by(self.get_metric_id_field_name()),
+                queryset=form_querysets.filter(year=self.year - i),
                 prefix=year_x)
             i += 1
-        formset_labels = form_querysets.filter(year=self.year).order_by(self.get_metric_id_field_name()).values_list(
+        formset_labels = form_querysets.filter(year=self.year).values_list(
             self.get_metric_model_name() + "__name", flat=True)
         if self.report_type != "transit_data":
             masking_class = ['Money'] * len(formset_labels)
         else:
-            masking_class = form_querysets.filter(year=self.year).order_by(self.get_metric_id_field_name()).values_list(
+            masking_class = form_querysets.filter(year=self.year).values_list(
                 self.get_metric_model_name() + "__form_masking_class", flat=True)
 
         return formsets, formset_labels, masking_class
@@ -352,10 +352,12 @@ class SummaryDataEntryBuilder(SummaryBuilder):
             for source in revenues:
                 filters.append([source['government_type'], source['funding_type']])
 
-            revenue_list_order_type = ['Operating', 'Capital']
-            revenue_list_order_gov = ['Local', 'State', 'Federal', 'Other']
-            filters.sort(key=lambda x: revenue_list_order_type.index(x[1]))
-            filters.sort(key=lambda x: revenue_list_order_gov.index(x[0]))
+            print(filters)
+            if len(filters) > 1:
+                revenue_list_order_type = ['Operating', 'Capital', 'Other']
+                revenue_list_order_gov = ['Local', 'State', 'Federal', 'Other']
+                filters.sort(key=lambda x: revenue_list_order_type.index(x[1]))
+                filters.sort(key=lambda x: revenue_list_order_gov.index(x[0]))
 
 
         elif self.report_type in ['expense', 'fund_balance', ]:
@@ -396,7 +398,7 @@ class SummaryDataEntryBuilder(SummaryBuilder):
                 if get_all_data_steps_completed(self.target_organization.id):
                     return redirect('submit_data')
                 else:
-                    raise Http404("You are not ready to submit your data.  Please be sure you have reviewed each section.")
+                    return redirect('you_skipped_a_step')
             else:
 
                 if self.report_type == "revenue":
@@ -439,6 +441,12 @@ class SummaryDataEntryTemplateData:
             self.show_totals = False
         else:
             self.show_totals = True
+
+        print(self.formset_labels)
+        if len(self.formset_labels) == 0:
+            self.no_reports = True
+        else:
+            self.no_reports = False
 
 
 class ConfigurationBuilder(SummaryBuilder):
@@ -714,9 +722,21 @@ class ReportAgencyDataTableBuilder(SummaryBuilder):
         return organization.objects.get(id = self.target_organization).summary_organization_classifications_id
 
 
-    def aggregate_data(self):
-        # filter by last three years and aggregate by year and metric
-        pass
+    def revenue_totals_and_exceptions(self, revenue):
+        if revenue == 'Farebox Revenues':
+            revenue_data = self.farebox_revenue
+            return revenue_data
+        elif revenue == 'Vanpooling Revenue':
+            revenue_data = self.vanpooling_revenue
+            return revenue_data
+        elif revenue == 'Other Operating Subtotal':
+            return self.data.filter(revenue_source__government_type = 'Other', revenue_source__funding_type = 'Operating').values('year').annotate(reported_value = Sum('reported_value')).order_by('year')
+        elif revenue == 'Total (Excludes Capital Revenue)':
+            return self.data.filter(revenue_source__funding_type='Operating').values('year').annotate(reported_value = Sum('reported_value')).order_by('year')
+        elif revenue == 'Total State Capital':
+            return self.data.filter(revenue_source__government_type='State',revenue_source__funding_type='Capital').values('year').annotate(reported_value=Sum('reported_value')).order_by('year')
+        elif revenue == 'Total Federal Capital':
+            return self.data.filter(organization_id=self.target_organization, year__in=self.years,revenue_source__government_type='Federal',revenue_source__funding_type='Capital').values('year').annotate(reported_value=Sum('reported_value')).order_by('year')
 
     def get_vanpool_revenue(self):
         return transit_data.objects.filter(organization_id =self.target_organization, year__in=self.years,transit_metric__name='Farebox Revenues',
@@ -735,36 +755,6 @@ class ReportAgencyDataTableBuilder(SummaryBuilder):
         else:
             raise Http404
 
-
-    def make_subtotal(self, revenue_type):
-        if len(revenue_type) == 1:
-            subtotal = self.data.filter(revenue_source__funding_type=revenue_type).values('year').annotate(reported_value=Sum('reported_value')).order_by('year')
-            heading = 'Total (Excludes Capital Revenues)'
-        else:
-            subtotal = self.data.filter(revenue_source__government_type=revenue_type[0], revenue_source__funding_type=[1]).values('year').annotate(reported_value = Sum('reported_value')).order_by('year')
-            if revenue_type == ('Other', 'Operating'):
-                heading = 'Other Operating Sub-Total'
-            else:
-                heading = 'Total {} {}'.format(revenue_type[0], revenue_type[1])
-        if not subtotal:
-            return None
-        subtotal_list = []
-        check_list = []
-        count = 1
-        subtotal = list(subtotal)
-        for k in subtotal:
-            check_list.append(k['reported_value'])
-            if k['reported_value'] == None:
-                k['reported_value'] = 0
-            subtotal_list.append(('year{}'.format(count), k['reported_value']))
-            count += 1
-        if list(set(check_list)) == [None]:
-            return None
-        try:
-            percent_change = ((subtotal_list[-1][1] - subtotal_list[-2][1])/subtotal_list[-2][1])*100
-        except ZeroDivisionError:
-            percent_change =100.00
-        return [('revenue_source', heading)] + subtotal_list + [('percent_change', percent_change), ('role', 'subtotal')]
 
 
     def get_table_types_by_organization(self):
@@ -806,6 +796,7 @@ class ReportAgencyDataTableBuilder(SummaryBuilder):
             for revenue_type in self.revenue_type_list:
                 revenue_source_list = self.metrics.filter(government_type=revenue_type[0], funding_type=revenue_type[1]).values_list('name', flat = True)
                 revenue_source_list = list(revenue_source_list)
+                print(revenue_source_list)
                 blank_heading_list = [('year1', ''), ('year2', ''), ('year3', ''), ('percent_change', ''), ('role', 'heading')]
                 if revenue_type == ('Local', 'Operating'):
                     heading = [('revenue_source', 'Operating Related Revenues')]
@@ -822,16 +813,9 @@ class ReportAgencyDataTableBuilder(SummaryBuilder):
                     heading = heading + blank_heading_list
                     heading = dict(heading)
                     revenue_report.add_row_component(heading)
-                elif revenue_type == ('Local', 'Capital'):
-                    heading = [('revenue_source', 'Local capital expenditures')]
-                    heading = heading + blank_heading_list
-                    heading = dict(heading)
-                    revenue_report.add_row_component(heading)
                 for revenue in revenue_source_list:
-                    if revenue == 'Farebox Revenues':
-                        revenue_data = self.farebox_revenue
-                    elif revenue == 'Vanpooling Revenue':
-                        revenue_data = self.vanpooling_revenue
+                    if revenue in ['Farebox Revenues', 'Vanpooling Revenue', 'Other Operating Subtotal', 'Total (Excludes Capital Revenue)', 'Total Federal Capital', 'Total State Capital']:
+                        revenue_data = self.revenue_totals_and_exceptions(revenue)
                     else:
                         revenue_data = self.data.filter(revenue_source__name=revenue).values('reported_value').order_by('year')
                     if not revenue_data:
@@ -848,28 +832,16 @@ class ReportAgencyDataTableBuilder(SummaryBuilder):
                         count += 1
                     if list(set(check_list)) == [None]:
                         continue
-                    print(revenue_data)
                     try:
                         percent_change = ((revenue_data_list[-1][1] - revenue_data_list[-2][1])/revenue_data_list[-2][1])*100
                     except ZeroDivisionError:
                         percent_change = 100.00
-                    revenue_data = [('revenue_source', revenue)] + revenue_data_list + [('percent_change',percent_change), ('role', 'body')]
+                    if revenue in ['Other Operating Subtotal', 'Total (Excludes Capital Revenue)', 'Total Federal Capital', 'Total State Capital']:
+                        revenue_data = [('revenue_source', revenue)] + revenue_data_list + [('percent_change',percent_change), ('role', 'subtotal')]
+                    else:
+                        revenue_data = [('revenue_source', revenue)] + revenue_data_list + [('percent_change', percent_change), ('role', 'body')]
                     revenue_data = dict(revenue_data)
                     revenue_report.add_row_component(revenue_data)
-                    if revenue in ['Other State Operating Grants', 'Other-MISC', 'CM/AQ and Other Federal Grants', 'Other State Capital Funds', 'Local Funds']:
-                        if revenue == 'Other State Operating Grants':
-                            revenue_type = ('Other', 'Operating')
-                            subtotal = self.make_subtotal(revenue_type)
-                        elif revenue == 'Other-MISC':
-                            revenue_type = ('Operating')
-                            subtotal = self.make_subtotal(revenue_type)
-                        else:
-                           subtotal = self.make_subtotal(revenue_type)
-                        if subtotal == None:
-                            continue
-                        else:
-                            subtotal = dict(subtotal)
-                            revenue_report.add_row_component(subtotal)
             return revenue_report
 
 
