@@ -129,10 +129,8 @@ DATABASES = {
         'PASSWORD': 'chVADlw35&$1@i08',
         'PORT': ''
 
-
     }
-}
-
+    }
 # Password validation
 # https://docs.djangoproject.com/en/2.1/ref/settings/#auth-password-validators
 

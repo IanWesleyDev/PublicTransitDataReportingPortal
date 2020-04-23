@@ -139,10 +139,10 @@ class organization(models.Model):
     #fixed_route_expansion = models.BooleanField(blank=True, null=True)
 
 
-class vanpool_details(models.Model):
-    organization = models.ForeignKey(organization, on_delete=models.PROTECT, related_name="+")
-    vanpool_program_start_date = models.DateField(blank=True, null=True)
-    vanpool_program_end_date = models.DateField(blank=True, null= True)
+#class vanpool_details(models.Model):
+ #   organization = models.ForeignKey(organization, on_delete=models.PROTECT, related_name="+")
+  #  vanpool_program_start_date = models.DateField(blank=True, null=True)
+   # vanpool_program_end_date = models.DateField(blank=True, null= True)
 
 
 class profile(models.Model):
@@ -489,7 +489,8 @@ class cover_sheet(models.Model):
     days_of_service = models.CharField(verbose_name="Days of service", max_length=250, blank=True, null=True)
     monorail_ownership = models.CharField(max_length=250, blank=True, null=True)
     community_planning_region = models.CharField(max_length=50, blank=True, null=True)
-    organization_logo = models.BinaryField(editable=True, blank=True, null=True)
+    #organization_logo = models.BinaryField(editable=True, blank=True, null=True)
+    organization_logo = models.CharField(blank=True, null=True, max_length=50)
     published_version = models.BooleanField(blank=True, null=True, default=False)
     history = HistoricalRecords()
     updated_at = models.DateTimeField(auto_now=True)
@@ -580,11 +581,11 @@ class stylesheets(models.Model):
     ferry_data = models.CharField(max_length=200, blank=True, null=True)
 
 
-class statewide_measures(models.Model):
-    title = models.CharField(max_length= 200, null=True, blank=True)
-    transit_data_files = models.CharField(max_length=500, blank=True, null=True)
-    data_type = models.CharField(max_length=40, null=True, blank=True)
-    measure_type = models.CharField(max_length=40, null=True, blank = True)
+#class statewide_measures(models.Model):
+ #   title = models.CharField(max_length= 200, null=True, blank=True)
+  #  transit_data_files = models.CharField(max_length=500, blank=True, null=True)
+   # data_type = models.CharField(max_length=40, null=True, blank=True)
+    #measure_type = models.CharField(max_length=40, null=True, blank = True)
 
 
 class service_area_population(models.Model):
