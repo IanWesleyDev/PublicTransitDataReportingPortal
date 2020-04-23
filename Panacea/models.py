@@ -469,7 +469,7 @@ class fund_balance(models.Model):
 
 
 class cover_sheet(models.Model):
-    organization = models.ForeignKey(organization, on_delete=models.PROTECT, blank=True, null=True, unique=True)
+    organization = models.OneToOneField(organization, on_delete=models.PROTECT, blank=True, null=True)
     executive_officer_first_name = models.CharField(max_length=50, blank=True, null=True)
     executive_officer_last_name = models.CharField(max_length=50, blank=True, null=True)
     executive_officer_title = models.CharField(max_length=50, blank=True, null=True)
@@ -567,11 +567,8 @@ class validation_errors(models.Model):
     administration_of_mode = models.CharField(max_length=80, choices=DO_OR_PT, blank=False, null=True)
     organization = models.ForeignKey(organization, on_delete=models.PROTECT, blank=True, null=True)
     report_by = models.ForeignKey(custom_user, on_delete=models.PROTECT, blank=True, null=True)
-    error = models.TextField(blank=True, null=True)
+    error = models.TextField(blank=True, null=True, )
     error_resolution = models.TextField(blank=True, null=True)
-
-    class Meta:
-        unique_together = ('year', 'transit_mode', 'administration_of_mode', 'organization', 'error',)
 
 
 class stylesheets(models.Model):
@@ -635,7 +632,7 @@ class summary_report_status(models.Model):
 
 class summary_organization_progress(models.Model):
 
-    organization = models.ForeignKey(organization, on_delete=models.PROTECT)
+    organization = models.OneToOneField(organization, on_delete=models.PROTECT)
     started = models.BooleanField(default=False)
     address_and_organization = models.BooleanField(default=False)
     organization_details = models.BooleanField(default=False)
@@ -646,8 +643,6 @@ class summary_organization_progress(models.Model):
     expenses = models.BooleanField(default=False)
     ending_balances = models.BooleanField(default=False)
 
-    class Meta:
-       unique_together = ('organization')
 
 class tax_rates(models.Model):
     governance_structure = models.CharField(max_length=50, blank=True, null=True)
