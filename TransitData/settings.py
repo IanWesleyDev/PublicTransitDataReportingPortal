@@ -117,20 +117,29 @@ WSGI_APPLICATION = 'TransitData.wsgi.application'
 
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
+#DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': os.path.join(BASE_DIR, 'db.PanaceaDB'),
+#     }
+# }
+
+
+
+
 # Database
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'sql_server.pyodbc',
-        'NAME': 'PublicTransportationDataReportingPortal',
-        'HOST': 'hqcw2sql01.database.windows.net',
-        'USER': 'PTDReportingPortal',
-        'PASSWORD': 'chVADlw35&$1@i08',
+   'default': {
+      'ENGINE': 'sql_server.pyodbc',
+     'NAME': 'PublicTransportationDataReportingPortal',
+     'HOST': 'hqcw2sql01.database.windows.net',
+    'USER': 'PTDReportingPortal',
+   'PASSWORD': 'chVADlw35&$1@i08',
         'PORT': ''
-
     }
-    }
+   }
 # Password validation
 # https://docs.djangoproject.com/en/2.1/ref/settings/#auth-password-validators
 
