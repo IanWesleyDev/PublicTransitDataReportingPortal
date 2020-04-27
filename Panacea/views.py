@@ -945,10 +945,12 @@ def cover_sheet_service_view(request):
     user_profile_data = profile.objects.get(custom_user=request.user.id)
     org = user_profile_data.organization
     service_type = org.summary_organization_classifications
+    print(service_type)
 
     cover_sheet_instance, created = cover_sheet.objects.get_or_create(organization=org)
 
     form = cover_sheet_service(instance=cover_sheet_instance)
+    print(form.fields)
     ready_to_submit = get_all_cover_sheet_steps_completed(org.id)
 
     if request.POST:
