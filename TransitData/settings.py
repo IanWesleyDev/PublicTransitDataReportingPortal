@@ -80,12 +80,13 @@ MIDDLEWARE = [
 ]
 
 
+EMAIL_BACKEND = 'sgbackend.SendGridBackend'
 if dev_mode:
     SENDGRID_API_KEY = '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'
 else:
     SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')
 
-EMAIL_BACKEND = 'sgbackend.SendGridBackend'
+
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 DEFAULT_FROM_EMAIL = 'ptreportingportal@wsdot.wa.gov'

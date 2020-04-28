@@ -12,7 +12,6 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
-from django.core.mail import send_mail, BadHeaderError
 from django.db import transaction
 from django.db.models import Max
 from django.db.models import Min, Sum, Avg
@@ -40,7 +39,7 @@ from .filters import VanpoolExpansionFilter, VanpoolReportFilter
 from django.conf import settings
 from .emails import send_user_registration_email, notify_user_that_permissions_have_been_requested, \
     active_permissions_request_notification, cover_sheet_review_complete, cover_sheet_returned_to_user, \
-    to_wsdot_cover_sheet_submitted, to_wsdot_data_report_submitted, data_report_review_complete
+    to_wsdot_cover_sheet_submitted, to_wsdot_data_report_submitted, data_report_review_complete, contact_us_email
 import base64
 from django import forms
 
@@ -945,12 +944,10 @@ def cover_sheet_service_view(request):
     user_profile_data = profile.objects.get(custom_user=request.user.id)
     org = user_profile_data.organization
     service_type = org.summary_organization_classifications
-    print(service_type)
 
     cover_sheet_instance, created = cover_sheet.objects.get_or_create(organization=org)
 
     form = cover_sheet_service(instance=cover_sheet_instance)
-    print(form.fields)
     ready_to_submit = get_all_cover_sheet_steps_completed(org.id)
 
     if request.POST:
@@ -1198,8 +1195,7 @@ def contact_us(request):
             from_email = form.cleaned_data['from_email']
             message = form.cleaned_data['message']
             try:
-                print('something')
-                send_mail(subject, message, from_email, [settings.DEFAULT_FROM_EMAIL,], fail_silently=False)
+                contact_us_email(subject, message, from_email)
             except BadHeaderError:
                 return HttpResponse('Invalid header found')
             return redirect('dashboard')
