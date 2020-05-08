@@ -45,7 +45,7 @@
                 <div class="card-body" style="">
                     <h3>Confirm current services</h3>
                     <div style="padding-left: 1rem">
-                        <p> Please confirm that these are the modes that your transit operates.  If you have add any new service or a modes is missing please add it below.
+                        <p> Please confirm that these are the modes that your transit operates.
                             To remove a mode press the delete button.
                         </p>
                         {% if error_no_modes %}
@@ -81,7 +81,7 @@
                     </div>
                     <h3>Add new service</h3>
                     <div style="padding-left: 1rem">
-                        <p> Please add any new modes that you are operating here</p>
+                        <p> Please add any new modes of service here</p>
                         {% if messages %}
                             {% for message in messages %}
                                 <h4 class="{{ message.tags }}">{{ message }}</h4>
@@ -117,16 +117,109 @@
                     <div class="text-center">
                         <a class="btn btn-lg btn-primary" href="{% url 'accept_modes' %}">Confirm service</a>
                     </div>
+                <br />
+                <br />
+                <br />
+
+                <p class = "text-center">Before adding or deleting a mode, please consider checking in with WSDOT first, as mode type often has important funding implications.</p>
                 </div>
-
-
-
-
             </div>
-
         </div>
-
     </div>
+
+{#    <div class="card">#}
+{#    <div class = 'card-body'#}
+{#        <div class = 'card-header'>#}
+{#        <h3 class="text-center">#}
+{#            <button class="btn btn-link" data-toggle="collapse" data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">#}
+{#                Transit mode appendix </button>#}
+{#        </h3>#}
+{#            </div>#}
+{#                <div id="collapseOne" class="collapse show" aria-labelledby="headingOne" data-parent="#accordion">#}
+{#                     <div class="card card-body">#}
+{#                <table>#}
+{#                    <thead>#}
+{#                    <tr>#}
+{#                    <th>#}
+{#                        Transit Mode#}
+{#                    </th>#}
+{#                        <th>Definition</th>#}
+{#                    </tr>#}
+{#                    </thead>#}
+{#                    <tbody>#}
+{#                    <tr>#}
+{#                    <td> Fixed Route</td>#}
+{#                        <td>Service provided on a repetitive, fixed schedule along a specific route with vehicles stopping to pick up#}
+{#                        and deliver passengers to specific locations</td>#}
+{#                    </tr>#}
+{#                                       <tr>#}
+{#                    <td> Demand Response</td>#}
+{#                        <td> A transit mode composed of passenger cars, vans, or small buses operating in response to calls from#}
+{#                        passengers or their agents to the transit operator, who then dispatches a vehicle to pick up the passengers and transport#}
+{#                        them to their destinations</td>#}
+{#                    </tr>#}
+{#                                                           <tr>#}
+{#                    <td> Vanpool</td>#}
+{#                        <td>A transit mode composed of vans, small buses, and other vehicles operating as a ride sharing arrangemennt#}
+{#                         that provides transportation to a group of individuals traveling directly between their homes and a regular destination#}
+{#                                                           within the same geopgaphical area</td>#}
+{#                    </tr>#}
+{#                                                           <tr>#}
+{#                    <td> Demand Response Taxi Services</td>#}
+{#                        <td>A form of demand response mode operated through taxicab providers. The mode is a purchased transportation service.</td>#}
+{#                    </tr>#}
+{#                                                           <tr>#}
+{#                    <td> Commuter Bus</td>#}
+{#                        <td>Local, fixed route transportation primarily connecting outlying areas with a central city</td>#}
+{#                    </tr>#}
+{#                                                          <tr>#}
+{#                    <td> Route Deviated</td>#}
+{#                        <td>A type of transit service that operates as conventional fixed-route bus service along a fixed alignment or path with#}
+{#                        scheduled time points at each terminal point and key intermediate locations. Route deviation service is different#}
+{#                        than conventional fixed-route bus service in that the bus may deviate from the route alignment to serve destinations within a prescribed distance#}
+{#                        (e.g. three quarters of a mile) of the route. Following an off route deviation, the bus must return to the point#}
+{#                        on the route it left. Passengers may use the service in two ways:#}
+{#                            <ul>#}
+{#                                <li>If they want to be taken off route as part of a service deviation, they must tell the bus operator when boarding.</li>#}
+{#                                <li>If they want to be picked up at an off route location, they must call the transit system and request a pickup, and the dispatcher#}
+{#                                notifies the bus operator.</li>#}
+{#                            </ul>#}
+{#                        </td>#}
+{#                    </tr>#}
+{#                                                          <tr>#}
+{#                    <td> Streetcar</td>#}
+{#                        <td>Rail transit mode for systems operating entire routes predominantly on streets in mixed traffic</td>#}
+{#                    </tr>#}
+{#                                                          <tr>#}
+{#                    <td> Trolley Bus</td>#}
+{#                        <td>A transit mode composed of electric passenger vehicles, manually steered and operating singly on city streets.#}
+{#                        Vehicles are propelled by a motor drawing currents through overhead wires via trolleys, from a central power source not on the vehicle</td>#}
+{#                    </tr>#}
+{#                                                          <tr>#}
+{#                    <td>Light Rail</td>#}
+{#                        <td>#}
+{#                        A transit mode that is typically an electric railway with a light volume traffic capacity as compared to heavy rail.#}
+{#                        </td>#}
+{#                    </tr>#}
+{#                                                          <tr>#}
+{#                    <td> Commuter Rail</td>#}
+{#                        <td>An electric or diesel propelled railway for urban passenger train service consisting of a local travel operating between a central city#}
+{#                        and outlying areas</td>#}
+{#                    </tr>#}
+{#                                                          <tr>#}
+{#                    <td> Bus Rapid Transit</td>#}
+{#                        <td>Fixed route bus systems that operate at least 50 percent of service on fixed guideway. These systems also have defined passenger stations, traffic signal priority, short#}
+{#                        headway services for a substantial part of weekdays and weekends, low floor vehicles or level platform boarding, and separate branding.#}
+{#                        Agencies typically use off-board fare collection as well.</td>#}
+{#                    </tr>#}
+{#                    </tbody>#}
+{#                </table>#}
+{#           </div>#}
+{#                </div>#}
+{#                </div>#}
+{#    </div>#}
+{#    #}
+
 
 
     <div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModal" aria-hidden="true">

@@ -988,9 +988,7 @@ def submit_cover_sheet(request):
         if form.is_valid():
             form.save()
             return submit_cover_sheet_submit(request)
-
-    return render(request, 'pages/summary/submit_cover_sheet.html', {'tribe': tribe,
-                                                                     'form': form})
+    return render(request, 'pages/summary/submit_cover_sheet.html', {'tribe': tribe, 'form': form})
 
 
 @login_required(login_url='/Panacea/login')
@@ -1000,13 +998,14 @@ def submit_cover_sheet_submit(request):
     ready_to_submit = get_all_cover_sheet_steps_completed(user_org.id)
     if not ready_to_submit:
         return redirect('you_skipped_a_step')
-
+    else:
+        successful_submit = True
     report_status = summary_report_status.objects.get(year=get_current_summary_report_year(), organization=user_org)
     report_status.cover_sheet_submitted_for_review = True
     report_status.cover_sheet_status = "With WSDOT"
     report_status.save()
     to_wsdot_cover_sheet_submitted(user_org.id)
-    return redirect('summary_report_data')
+    return render(request, 'pages/summary/submit_cover_sheet.html', {'successful_submit': successful_submit})
 
 
 @login_required(login_url='/Panacea/login')
