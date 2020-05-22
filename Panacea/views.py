@@ -960,7 +960,8 @@ def cover_sheet_service_view(request):
     service_type = org.summary_organization_classifications.name
 
     cover_sheet_instance, created = cover_sheet.objects.get_or_create(organization=org)
-
+    print(cover_sheet_instance.current_operations)
+    print(cover_sheet_instance.community_planning_region)
     form = cover_sheet_service(instance=cover_sheet_instance)
     ready_to_submit = get_all_cover_sheet_steps_completed(org.id)
 

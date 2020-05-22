@@ -623,7 +623,8 @@ class cover_sheet_organization(forms.ModelForm):
                   'type_of_government',
                   'governing_body',
                   'tax_rate_valid',
-                  'tax_rate_comment']
+                  'tax_rate_comment'
+                  ]
         widgets = {
             'executive_officer_first_name': forms.TextInput(attrs={'class': 'form-control'}),
             'executive_officer_last_name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -660,7 +661,8 @@ class cover_sheet_service(forms.ModelForm):
                   'days_of_service',
                   'current_operations',
                   'revenue_service_vehicles',
-                  # 'tax_rate_description'
+                  'community_planning_region',
+                  'monorail_ownership'
                   ]
         widgets = {
             'service_area_description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
@@ -670,6 +672,11 @@ class cover_sheet_service(forms.ModelForm):
             'days_of_service': forms.TextInput(attrs={'class': 'form-control'}),
             'current_operations': CKEditorWidget(),
             'revenue_service_vehicles': CKEditorWidget(),
+            'community_planning_region': forms.TextInput(attrs={'class': 'form-control',
+                                                                'label': 'Planning Region'}),
+            'monorail_ownership': forms.TextInput(attrs={'class': 'form-control',
+                                                         'label': 'Ownership','size': 20})
+
             # 'tax_rate_description': forms.Textarea(attrs={'class': 'form-control'}),
         }
 
@@ -703,7 +710,7 @@ class cover_sheet_wsdot_review(forms.ModelForm):
 
     class Meta:
         model = cover_sheet
-        exclude = ['id', 'organization', 'transit_development_plan_url', 'monorail_ownership', 'community_planning_region',]
+        exclude = ['id', 'organization', 'transit_development_plan_url',]
 
         widgets = {
             'executive_officer_first_name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -725,6 +732,9 @@ class cover_sheet_wsdot_review(forms.ModelForm):
             'current_operations': forms.Textarea(attrs={'class': 'form-control'}),
             'revenue_service_vehicles': forms.TextInput(attrs={'class': 'form-control'}),
             'tax_rate_description': forms.Textarea(attrs={'class': 'form-control'}),
+            'community_planning_region': forms.TextInput(attrs={'class':'form-control',
+                                                               'label':'Planning Regions'}),
+            'monorail_ownership':forms.TextInput(attrs= {'class': 'form-control'})
         }
 
     def clean_organization_logo_input(self):
