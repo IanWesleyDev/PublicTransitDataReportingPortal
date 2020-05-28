@@ -1526,6 +1526,7 @@ def add_cover_sheet_note_wsdot(request, year, summary_report_status_id, note_are
 
     print(note_area)
     print(cover_sheet_review_notes.NOTE_AREAS)
+    print(note_field)
 
     if request.POST:
         form = add_cover_sheet_review_note(request.POST)
