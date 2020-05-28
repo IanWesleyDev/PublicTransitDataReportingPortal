@@ -78,7 +78,7 @@
 
                                     {% endif %}
 
-                                    {% if service_type != 'Monorail'  %}
+
                                     {{ form.intermodal_connections.label_tag }}
                                     <sup>
                                         <i class="fas fa-question-circle help-popover"
@@ -87,7 +87,6 @@
                                     </sup>
                                     <p>{{ form.intermodal_connections}}</p>
 
-                                {% endif %}
 
                                     {% if service_type != "Medicaid broker" %}
                                     {{ form.fares_description.label_tag }}
